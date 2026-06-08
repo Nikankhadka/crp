@@ -1,0 +1,40 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+.next/
+out/
+.vercel/
+
+# Data (user-specific, not committed)
+data/
+output/
+traces/
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OpenClaw skills (installed locally, not committed)
+~/.openclaw/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS
+Thumbs.db
