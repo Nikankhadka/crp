@@ -1,10 +1,24 @@
-import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createMockServer, VALID_SCORE, type MockServer } from './mock-server.js';
 
 const hasSeed = existsSync('seed/me/resume.yaml');
 const maybe = hasSeed ? describe : describe.skip;
+
+function hasCommand(command: string, args: string[]): boolean {
+  try {
+    execFileSync(command, args, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const hasRenderTools =
+  hasCommand('typst', ['--version']) && hasCommand('pdfinfo', ['-v']);
+const maybeRender = hasSeed && hasRenderTools ? describe : describe.skip;
 
 interface RunResult {
   code: number | null;
@@ -12,9 +26,9 @@ interface RunResult {
   stderr: string;
 }
 
-function run(baseUrl: string, command = 'score'): Promise<RunResult> {
+function run(baseUrl: string, args: string[] = ['score']): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', ['tsx', 'src/cli.ts', command, 'test/fixtures/sample-jd.txt'], {
+    const child = spawn('npx', ['tsx', 'src/cli.ts', ...args, 'test/fixtures/sample-jd.txt'], {
       cwd: process.cwd(),
       env: {
         ...process.env,
@@ -65,12 +79,43 @@ maybe('cli score', () => {
     });
     servers.push(server);
 
-    const result = await run(server.url, 'tailor');
+    const result = await run(server.url, ['tailor']);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
     const parsed = JSON.parse(result.stdout);
     expect(parsed.score).toEqual(VALID_SCORE);
     expect(parsed.tailored).toEqual(VALID_TAILORED);
+  }, 60_000);
+});
+
+maybeRender('cli render', () => {
+  const servers: MockServer[] = [];
+  const outDir = join('out', 'local', 'sample-jd', 'v1');
+
+  afterEach(async () => {
+    rmSync(join('out', 'local', 'sample-jd'), { recursive: true, force: true });
+    await Promise.all(servers.splice(0).map((server) => server.close()));
+  });
+
+  it('scores, tailors and renders out/local/sample-jd/v1', async () => {
+    const server = await createMockServer((body) => {
+      const messages = (body as { messages?: { role: string; content: string }[] }).messages ?? [];
+      const system = messages.find((m) => m.role === 'system')?.content ?? '';
+      const content = system.includes('tailor the bank to a job advertisement')
+        ? VALID_TAILORED
+        : VALID_SCORE;
+      return { content: JSON.stringify(content) };
+    });
+    servers.push(server);
+
+    const result = await run(server.url, ['test/fixtures/sample-jd.txt']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('score: 80');
+    expect(result.stdout).toContain('pages: 1');
+    expect(existsSync(join(outDir, 'score.json'))).toBe(true);
+    expect(existsSync(join(outDir, 'resume.json'))).toBe(true);
+    expect(existsSync(join(outDir, 'resume.pdf'))).toBe(true);
+    expect(existsSync(join(outDir, 'cover-letter.md'))).toBe(false);
   }, 60_000);
 });
 
