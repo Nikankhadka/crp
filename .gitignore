@@ -25,6 +25,11 @@ logs/
 seed/me/
 .opencode/
 
+# Personal reference material synced to the user's Drive (never committed)
+masterresume/
+README 2.md
+/0*.md
+
 # IDE
 .vscode/
 .idea/

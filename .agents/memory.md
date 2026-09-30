@@ -2,6 +2,14 @@
 
 ## Decisions
 
+- Seed rebuilt from `masterresume/masterresume.md` plus the `07_project_memory_notes.md`
+  standing corrections (Eight Bit ends Feb 2025, MeroGhar ~94% on key routes, AgenCx live on
+  Vercel with AWS Terraform dormant, Paypipe ~70% hedged). `profile.targets` is now a list of
+  `{ role, track }` so tech and care targets stay distinguishable.
+- `GuardOptions.neverMention` mirrors `vocabulary`: the caller supplies the term list and the
+  guard checks containment in the rewrite against its source or the bank skills. It is not yet
+  wired from `profile.exclusions` in the CLI (same as `vocabulary`); the prompt layer carries
+  the never-mention enforcement.
 - Bank schema: `z.strictObject` at the top level so a misplaced key errors loudly; basics,
   items, summaries and skills use `.passthrough()` so extra facts survive.
 - `mergeResume` resolves org/title/name/credential/dates/tech from the bank; only bullet text
@@ -23,10 +31,23 @@
   verify ids/facts by deep-comparing the old and new parse before trusting the transform.
 - `.strict()` / `.passthrough()` still work in zod 4.6.5; `z.strictObject` is the explicit
   top-level form.
+- Typst 0.15 `json(sys.inputs.data)` resolves a relative path against the *calling file's*
+  directory (`templates/`), not the `--root`. A repo-relative path fails; a root-anchored path
+  (`data=/out/...`) with `--root <repoRoot>` works. That is why `renderPdf` passes
+  `data=/${relative(repoRoot, dataPath)}`.
+- Render integration tests must write inside the repo (`out/`), not the OS temp dir, because the
+  Typst `--root` sandbox rejects paths outside it.
+- The reference document `03_job_application_MoE_system_prompt.md` contains a corrupted line
+  ("Possibly inflate ownership, seniority or tenure") that the project memory says to ignore.
+  Never propagate it.
 
 ## Conventions
 
 - Tests stay portable: bank/guard fixtures inline their YAML; CLI and render tests skip
   cleanly when `seed/me/`, `typst` or `pdfinfo` are absent.
 - Prompts under `prompts/base` stay job-agnostic; the vocabulary blocklist test walks every
-  `.md` file there, so adding a prompt file automatically extends the check.
+  `.md` file there, so adding a prompt file automatically extends the check. The blocklist
+  includes "software", "engineer" and "developer", so ATS prose must avoid those words.
+- Dates use an en dash (U+2013) "MMM YYYY - MMM YYYY"; never an em dash anywhere.
+- Personal reference material at the repo root (`masterresume/`, `README 2.md`, `/0*.md`) is
+  gitignored and must not be edited, deleted or committed.
