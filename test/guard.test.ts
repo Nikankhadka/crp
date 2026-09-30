@@ -210,4 +210,78 @@ describe('guard', () => {
     });
     expect(guard(result, bank, { vocabulary: ['Node.js'] })).toEqual([]);
   });
+
+  it('flags a never-mention term slipped into a bullet', () => {
+    const result = tailored({
+      sections: [
+        {
+          type: 'experience',
+          items: [
+            {
+              itemId: 'exp-one',
+              bullets: [
+                {
+                  sourceId: 'exp-one-02',
+                  text: 'Implemented REST APIs with Node.js and Docker, and ran Kubernetes workloads.',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const violations = guard(result, bank, { neverMention: ['Kubernetes'] });
+    expect(violations.some((v) => v.rule === 'neverMention')).toBe(true);
+    // Without the option the same rewrite is not flagged by this rule.
+    expect(guard(result, bank)).toEqual([]);
+  });
+
+  it('allows a never-mention term present in the source or the bank skills', () => {
+    const fromSource = tailored({
+      sections: [
+        {
+          type: 'experience',
+          items: [
+            {
+              itemId: 'exp-one',
+              bullets: [
+                { sourceId: 'exp-one-02', text: 'Implemented REST APIs with Node.js.' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(guard(fromSource, bank, { neverMention: ['Node.js'] })).toEqual([]);
+
+    const fromSkills = tailored({
+      sections: [
+        {
+          type: 'experience',
+          items: [
+            {
+              itemId: 'exp-one',
+              bullets: [
+                {
+                  sourceId: 'exp-one-01',
+                  text: 'Built a platform used by about 20 clients with TypeScript.',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    // TypeScript is not in exp-one-01's source but is a bank skill.
+    expect(guard(fromSkills, bank, { neverMention: ['TypeScript'] })).toEqual([]);
+  });
+
+  it('flags a never-mention term slipped into the summary rewrite', () => {
+    const violations = guard(
+      tailored({ summaryRewrite: 'Full-stack developer with Kubernetes.' }),
+      bank,
+      { neverMention: ['Kubernetes'] },
+    );
+    expect(violations.some((v) => v.rule === 'neverMention')).toBe(true);
+  });
 });

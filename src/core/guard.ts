@@ -8,7 +8,8 @@ export type GuardRule =
   | 'number'
   | 'reword'
   | 'skill'
-  | 'vocabulary';
+  | 'vocabulary'
+  | 'neverMention';
 
 export interface Violation {
   rule: GuardRule;
@@ -20,6 +21,8 @@ export interface Violation {
 export interface GuardOptions {
   /** Research brief terms (next slice). Any term a rewrite uses must be in its source or the bank skills. */
   vocabulary?: string[];
+  /** The personal layer's never-mention register. Any listed term in a rewrite must be in its source or the bank skills. */
+  neverMention?: string[];
 }
 
 // Word-overlap rule (rewording check): lowercase the text, replace every non-alphanumeric
@@ -104,6 +107,19 @@ export function guard(tailored: Tailored, bank: Bank, options: GuardOptions = {}
     }
   }
 
+  // (g) the summary rewrite must not introduce a never-mention term its source does not carry.
+  if (sourceSummary) {
+    for (const term of options.neverMention ?? []) {
+      if (!containsTerm(tailored.summaryRewrite, term)) continue;
+      if (containsTerm(sourceSummary.text, term) || skillTerms.has(term)) continue;
+      violations.push({
+        rule: 'neverMention',
+        ref: term,
+        message: `summaryRewrite uses "${term}", which is not in its source or the bank skills`,
+      });
+    }
+  }
+
   for (const section of tailored.sections) {
     for (const item of section.items) {
       // (a) item id must exist.
@@ -154,6 +170,17 @@ export function guard(tailored: Tailored, bank: Bank, options: GuardOptions = {}
           if (containsTerm(sourceText, term) || skillTerms.has(term)) continue;
           violations.push({
             rule: 'vocabulary',
+            ref: term,
+            message: `bullet for "${bullet.sourceId}" uses "${term}", which is not in its source or the bank skills`,
+          });
+        }
+
+        // (g) never-mention terms must be supported by the source bullet or the bank skills.
+        for (const term of options.neverMention ?? []) {
+          if (!containsTerm(bullet.text, term)) continue;
+          if (containsTerm(sourceText, term) || skillTerms.has(term)) continue;
+          violations.push({
+            rule: 'neverMention',
             ref: term,
             message: `bullet for "${bullet.sourceId}" uses "${term}", which is not in its source or the bank skills`,
           });
