@@ -11,8 +11,10 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const tracePath = join(repoRoot, 'traces', 'llm-calls.jsonl');
 
 // Node 22 built-in. .env is optional; real environment variables take precedence.
+// Resolved from the repo root (same logic as cli.ts) so the client loads the same file no
+// matter which directory the process runs from.
 try {
-  process.loadEnvFile('.env');
+  process.loadEnvFile(join(repoRoot, '.env'));
 } catch {
   // no .env file, use the ambient environment
 }

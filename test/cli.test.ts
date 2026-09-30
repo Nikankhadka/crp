@@ -12,9 +12,9 @@ interface RunResult {
   stderr: string;
 }
 
-function run(baseUrl: string): Promise<RunResult> {
+function run(baseUrl: string, command = 'score'): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', ['tsx', 'src/cli.ts', 'score', 'test/fixtures/sample-jd.txt'], {
+    const child = spawn('npx', ['tsx', 'src/cli.ts', command, 'test/fixtures/sample-jd.txt'], {
       cwd: process.cwd(),
       env: {
         ...process.env,
@@ -53,4 +53,47 @@ maybe('cli score', () => {
     const parsed = JSON.parse(result.stdout);
     expect(parsed).toEqual(VALID_SCORE);
   }, 60_000);
+
+  it('tailor prints { score, tailored } as JSON', async () => {
+    // Distinguish tasks by the system prompt: the tailor task carries tailor.md's heading.
+    const server = await createMockServer((body) => {
+      const messages = (body as { messages?: { role: string; content: string }[] }).messages ?? [];
+      const system = messages.find((m) => m.role === 'system')?.content ?? '';
+      const isTailor = system.includes('tailor the bank to a job advertisement');
+      const content = isTailor ? VALID_TAILORED : VALID_SCORE;
+      return { content: JSON.stringify(content) };
+    });
+    servers.push(server);
+
+    const result = await run(server.url, 'tailor');
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.score).toEqual(VALID_SCORE);
+    expect(parsed.tailored).toEqual(VALID_TAILORED);
+  }, 60_000);
 });
+
+// Minimal tailored payload valid against test/fixtures/sample-jd.txt's real bank shape.
+const VALID_TAILORED = {
+  summaryId: 'summary-care-01',
+  summaryRewrite: 'Compassionate support worker with recent Australian placement experience.',
+  sections: [
+    {
+      type: 'experience',
+      items: [
+        {
+          itemId: 'exp-delifresco',
+          bullets: [
+            {
+              sourceId: 'exp-delifresco-01',
+              text: 'Enhanced customer experience through personalized recommendations, inquiries assistance, and efficient purchase support.',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  skillsOrder: ['TypeScript', 'Playwright'],
+  gaps: ['No first aid certificate on file'],
+};

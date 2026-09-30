@@ -2,6 +2,9 @@
   "name": "resume-refiner",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest run",
