@@ -35,13 +35,15 @@ const bankText = `
 summaries:
   - id: summary-01
     text: Full-stack developer with 20 clients.
-experience:
-  - id: exp-one
-    title: Developer
-    org: Example Co
-    bullets:
-      - id: exp-one-01
-        text: Built a platform used by about 20 clients.
+sections:
+  - type: experience
+    items:
+      - id: exp-one
+        title: Developer
+        org: Example Co
+        bullets:
+          - id: exp-one-01
+            text: Built a platform used by about 20 clients.
 skills:
   - id: skill-tech
     items: [TypeScript]

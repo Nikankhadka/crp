@@ -67,18 +67,11 @@ export function guard(tailored: Tailored, bank: Bank, options: GuardOptions = {}
   const summaryById = new Map(bank.summaries.map((summary) => [summary.id, summary]));
   const bulletById = new Map<string, string>();
   const itemIds = new Set<string>();
-  for (const group of [bank.experience, bank.projects, bank.education]) {
-    for (const item of group) {
+  for (const section of bank.sections) {
+    for (const item of section.items) {
       itemIds.add(item.id);
-      for (const bullet of item.bullets ?? []) {
-        // Certifications and awards also carry bullet-like ids; they are not selectable as
-        // experience items but their text can still be cited if ever surfaced.
-        bulletById.set(bullet.id, bullet.text);
-      }
+      for (const bullet of item.bullets ?? []) bulletById.set(bullet.id, bullet.text);
     }
-  }
-  for (const cert of bank.certifications) {
-    for (const note of cert.notes ?? []) bulletById.set(note.id, note.text);
   }
 
   const skillTerms = new Set<string>();

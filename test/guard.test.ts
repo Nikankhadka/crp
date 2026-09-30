@@ -7,24 +7,27 @@ const bank: Bank = parseBank(`
 summaries:
   - id: summary-01
     text: Full-stack developer with 20 clients and 70% faster delivery.
-experience:
-  - id: exp-one
-    title: Developer
-    org: Example Co
-    bullets:
-      - id: exp-one-01
-        text: Built a platform used by about 20 clients and cut effort by 70%.
-      - id: exp-one-02
-        text: Implemented REST APIs with Node.js.
-  - id: exp-empty
-    title: Empty Role
-    org: Nowhere
-projects:
-  - id: proj-one
-    name: Example Project
-    bullets:
-      - id: proj-one-01
-        text: Optimised performance, bundle size down 20%+.
+sections:
+  - type: experience
+    items:
+      - id: exp-one
+        title: Developer
+        org: Example Co
+        bullets:
+          - id: exp-one-01
+            text: Built a platform used by about 20 clients and cut effort by 70%.
+          - id: exp-one-02
+            text: Implemented REST APIs with Node.js.
+      - id: exp-empty
+        title: Empty Role
+        org: Nowhere
+  - type: projects
+    items:
+      - id: proj-one
+        name: Example Project
+        bullets:
+          - id: proj-one-01
+            text: Optimised performance, bundle size down 20%+.
 skills:
   - id: skill-tech
     category: Programming
