@@ -21,6 +21,10 @@ output/
 traces/
 logs/
 
+# Personal seed bank and local agent config (never committed)
+seed/me/
+.opencode/
+
 # IDE
 .vscode/
 .idea/

@@ -1,77 +1,36 @@
-# AGENTS.md — CareerPilot
+# AGENTS.md - Resume Refiner
 
-## Build workflow
+## Purpose
 
-This repo is a set of sequential prompts, not ready-made source code. To build the app:
+A job-agnostic resume engine. It scores and tailors resumes against a job advertisement
+using a personal seed bank, without hard-coding any occupation.
 
-1. Run each prompt in `AGENT_PROMPTS.md` in order (01 → 16). Each prompt is self-contained.
-2. Verify the "Done when:" condition at the end of each prompt before moving to the next.
-3. Do not skip or reorder prompts — each builds on the previous.
-
-## Tech stack
-
-- **Backend:** NestJS + TypeScript, port 3001 (3000 reserved for dashboard)
-- **Database:** Supabase (Postgres + pgvector)
-- **LLM:** OpenRouter (free models: LLaMA 3.1, Gemma 2, Mistral)
-- **Scraping:** Playwright (headless Chromium)
-- **Bot:** discord.js v14 with slash commands
-- **Dashboard:** Next.js 14 (App Router) + Tailwind, reads Supabase directly
-- **Libraries:** exceljs, @nestjs/schedule, @nestjs/config, axios, bull
-
-## Environment
-
-Requires `.env` at project root with these keys before any run:
-```
-OPENROUTER_API_KEY=
-SUPABASE_URL=
-SUPABASE_SERVICE_KEY=
-DISCORD_BOT_TOKEN=
-DISCORD_CHANNEL_ID=
-TARGET_ROLES=
-TARGET_LOCATIONS=
-MIN_MATCH_SCORE=65
-MAX_DAILY_APPLICATIONS=20
-AUTO_APPLY=false
-```
-
-## Project structure (after build)
+## Repo layout
 
 ```
-src/
-├── agents/          # Coordinator, Analyst, Writer, Scout services
-├── intelligence/    # LlmService (OpenRouter wrapper)
-├── scrapers/        # SeekService (Playwright), later LinkedIn, Indeed
-├── tracking/        # DatabaseService (Supabase), ExcelService
-├── discord/         # DiscordService (slash commands, approval flow)
-├── scheduler/       # Cron jobs (daily run, stale app checker)
-├── common/          # models.ts, config.ts
-├── app.module.ts
-└── main.ts
-data/
-├── resume.json
-├── resumes/
-├── applications.xlsx
-traces/
-output/
-dashboard/           # Next.js app (separate `npm run dev`)
+prompts/base/     universal, job-agnostic prompt files (system.md, one task file per task)
+src/core/         schemas.ts (zod), prompt.ts (assembly), score.ts (score task)
+src/providers/    llm.ts (OpenAI-compatible client with fallback and JSONL traces)
+src/cli.ts        the `score <jd.txt>` entry point
+seed/me/          personal seed bank: profile.yaml, resume.yaml, personal.md (gitignored)
+test/             vitest tests and fixtures (no network)
+traces/           llm-calls.jsonl traces (gitignored)
 ```
 
 ## Key commands
 
 ```bash
-npm run start:dev    # NestJS dev server (port 3001)
-npm run test         # Jest (single test: `npm test -- --testPathPattern llm.service`)
+npm install
+npm run check
+npm test
+npx tsx src/cli.ts score <jd.txt>
 ```
-
-## Not in this repo
-
-- `OPENCLAW_PHASE1.md` documents a separate lightweight approach using the OpenClaw desktop app — not part of the NestJS build.
-- OpenClaw skill files referenced in Prompt 16 go into `~/.openclaw/skills/`, not this repo.
 
 ## Conventions
 
-- NestJS `@Injectable()` + constructor DI throughout. No manual instantiation.
-- All LLM calls go through `LlmService` only. Never call OpenRouter directly from other services.
-- Playwright browser lifecycle managed by `SeekService` (`onModuleDestroy` closes browser).
-- Supabase schema created via SQL editor (SQL provided in Prompt 04). No migrations framework.
-- Traces saved to `traces/` directory as timestamped JSON files for debugging LLM calls.
+- All LLM calls go through `src/providers/llm.ts`. Never call a provider directly elsewhere.
+- Prompts are files under `prompts/base`. Task prompts must stay job-agnostic: no
+  occupation-specific vocabulary.
+- Personal data lives in `seed/me/` or the database, never in `prompts/base`.
+- `prompts/base` output is JSON only; every generated bullet cites the bank id it used.
+- Keep code minimal and boring. No build step; run TypeScript directly with tsx.

@@ -1,5 +1,21 @@
 {
+  "name": "resume-refiner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "cli": "tsx src/cli.ts"
+  },
   "dependencies": {
-    "xlsx": "^0.18.5"
+    "openai": "^7.25.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
   }
 }
