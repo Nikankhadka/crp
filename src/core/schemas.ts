@@ -11,3 +11,31 @@ export const ScoreSchema = z.object({
 });
 
 export type Score = z.infer<typeof ScoreSchema>;
+
+export const TailorSchema = z.object({
+  summaryId: z.string(),
+  summaryRewrite: z.string().max(400),
+  sections: z.array(
+    z.object({
+      type: z.string(),
+      items: z.array(
+        z.object({
+          itemId: z.string(),
+          bullets: z
+            .array(
+              z.object({
+                sourceId: z.string(),
+                text: z.string().max(220),
+              }),
+            )
+            .max(5),
+        }),
+      ),
+    }),
+  ),
+  skillsOrder: z.array(z.string()),
+  gaps: z.array(z.string()),
+  coverLetter: z.string().max(1800).optional(),
+});
+
+export type Tailored = z.infer<typeof TailorSchema>;
