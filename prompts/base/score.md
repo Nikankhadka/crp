@@ -15,6 +15,10 @@ Score the job advertisement against the personal layer. Return JSON only.
 ## Rules
 
 - Compare only against facts in the personal layer. Do not assume anything not stated.
+- Roles that require citizenship, permanent residency (PR) or a security clearance are hard
+  blockers. So are roles whose hard requirements are all in the personal layer's
+  never-mention list. State the blocker in both `redFlags` and `mustHavesMissing` and score
+  the role down. Never count a never-mention item as met.
 - If the advertisement is a snippet or partial description rather than a full posting,
   cap the score at 75 and record that in `redFlags`.
 - Report what is missing. Do not fill gaps with plausible guesses.

@@ -14,12 +14,21 @@ Produce a tailored resume selection from the personal bank. Return JSON only.
 - List every requirement in the advertisement the bank does not evidence under `gaps`.
   Do not invent evidence to fill a gap.
 
+## Personal layer
+
+- The personal layer is authoritative. Obey its never-mention list: never output a listed
+  term, even when the advertisement names it.
+- Obey its verification-queue rule: leave out any bank fact tagged `verify` until it is
+  resolved.
+- Obey its preferred section order; it overrides the default order below.
+
 ## Section order and length
 
 - When a research brief is present, follow the section order and length it states.
 - When there is no research brief, use this default order and length: summary, experience,
-  projects, education, skills. Prefer the most recent and most relevant experience; keep the
-  tailored resume to at most two pages, and each role to at most five bullets.
+  projects, education, skills, unless the personal layer states a different preferred order,
+  which wins. Prefer the most recent and most relevant experience; keep the tailored resume
+  to at most two pages, and each role to at most five bullets.
 
 ## Numbers and vocabulary
 
