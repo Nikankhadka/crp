@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Bank, BankItem } from '../core/bank.js';
 import type { Tailored } from '../core/schemas.js';
@@ -88,11 +88,20 @@ export function renderPdf(doc: MergedResume, outDir: string): string {
   const pdfPath = join(outDir, 'resume.pdf');
   writeFileSync(dataPath, `${JSON.stringify(doc, null, 2)}\n`);
 
-  // Typst's `json(sys.inputs.data)` loads the given path itself. It is sandboxed to the input
-  // file's directory by default, so `--root /` lets the absolute data path resolve.
+  // Typst's `json(sys.inputs.data)` loads the given path itself, scoped to the project root set
+  // by `--root`. A root-anchored path keeps the repo as the sandbox: no `--root /`, no absolute
+  // host path. Data lives under out/ inside the repo, so the repo-relative path is valid.
   execFileSync(
     'typst',
-    ['compile', templatePath, pdfPath, '--input', `data=${realpathSync(dataPath)}`, '--root', '/'],
+    [
+      'compile',
+      templatePath,
+      pdfPath,
+      '--input',
+      `data=/${relative(repoRoot, dataPath)}`,
+      '--root',
+      repoRoot,
+    ],
     { stdio: 'pipe' },
   );
   return pdfPath;

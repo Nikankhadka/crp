@@ -46,7 +46,8 @@
         let org = present(item, ("org", "institution")).at(0, default: none)
         let start = field(item, "start")
         let end = field(item, "end")
-        let dates = if start != none and end != none { start + " - " + end }
+        // En dash (U+2013) between start and end, matching "MMM YYYY – MMM YYYY". Never an em dash.
+        let dates = if start != none and end != none { start + " – " + end }
           else if start != none { start }
           else if end != none { end }
           else { none }

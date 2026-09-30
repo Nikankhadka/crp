@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseBank, type Bank } from '../src/core/bank.js';
@@ -163,7 +162,10 @@ const maybe = hasTypst && hasPdfinfo ? describe : describe.skip;
 
 maybe('typst integration', () => {
   it('renders the fixture document to a one-page PDF', () => {
-    const outDir = mkdtempSync(join(tmpdir(), 'cpilot-render-'));
+    // Typst is sandboxed to the repo root, so render inside out/ (gitignored), not the OS temp dir.
+    const outBase = join(process.cwd(), 'out');
+    mkdirSync(outBase, { recursive: true });
+    const outDir = mkdtempSync(join(outBase, 'render-test-'));
     try {
       const pdfPath = renderPdf(doc, outDir);
       expect(existsSync(pdfPath)).toBe(true);
