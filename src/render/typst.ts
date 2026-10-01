@@ -41,6 +41,67 @@ export interface MergedResume {
   skills: string[];
 }
 
+/** One piece of text and whether the template should render it strong. */
+export interface BoldRun {
+  text: string;
+  bold: boolean;
+}
+
+interface RichItem extends Omit<MergedItem, 'text' | 'bullets'> {
+  text?: BoldRun[];
+  bullets: { id: string; runs: BoldRun[] }[];
+}
+
+interface RichSection {
+  type: string;
+  items: RichItem[];
+}
+
+interface RichResume {
+  basics: Bank['basics'];
+  summary: BoldRun[];
+  sections: RichSection[];
+  skills: string[];
+}
+
+/**
+ * Split a string on `**`. Odd segments are bold anchors; even segments stay plain. An unmatched
+ * trailing marker (an odd number of markers) is kept literally so nothing is silently dropped.
+ */
+export function splitBold(text: string): BoldRun[] {
+  const parts = text.split('**');
+  if (parts.length === 1) return text === '' ? [] : [{ text, bold: false }];
+
+  const pairs = Math.floor((parts.length - 1) / 2);
+  const runs: BoldRun[] = [];
+  let i = 0;
+  for (let pair = 0; pair < pairs; pair += 1) {
+    if (parts[i] !== '') runs.push({ text: parts[i], bold: false });
+    if (parts[i + 1] !== '') runs.push({ text: parts[i + 1], bold: true });
+    i += 2;
+  }
+  const tail = parts.slice(i).join('**');
+  if (tail !== '') runs.push({ text: tail, bold: false });
+  return runs;
+}
+
+/** Resolve `**` markers into renderable runs for the summary, every bullet and item-level text. */
+export function toRich(doc: MergedResume): RichResume {
+  return {
+    basics: doc.basics,
+    summary: splitBold(doc.summary),
+    skills: doc.skills,
+    sections: doc.sections.map((section) => ({
+      type: section.type,
+      items: section.items.map((item) => ({
+        ...item,
+        text: item.text === undefined ? undefined : splitBold(item.text),
+        bullets: item.bullets.map((bullet) => ({ id: bullet.id, runs: splitBold(bullet.text) })),
+      })),
+    })),
+  };
+}
+
 /**
  * Resolve a tailored result into the plain document the Typst template renders. Org, title,
  * name, credentials and dates always come from the bank, never from the model; only the
@@ -86,7 +147,7 @@ export function renderPdf(doc: MergedResume, outDir: string): string {
   mkdirSync(outDir, { recursive: true });
   const dataPath = join(outDir, 'resume.json');
   const pdfPath = join(outDir, 'resume.pdf');
-  writeFileSync(dataPath, `${JSON.stringify(doc, null, 2)}\n`);
+  writeFileSync(dataPath, `${JSON.stringify(toRich(doc), null, 2)}\n`);
 
   // Typst's `json(sys.inputs.data)` loads the given path itself, scoped to the project root set
   // by `--root`. A root-anchored path keeps the repo as the sandbox: no `--root /`, no absolute
@@ -115,13 +176,13 @@ export function countPages(pdfPath: string): number {
   return Number(match[1]);
 }
 
-export interface RenderOnePageDeps {
+export interface RenderToTargetDeps {
   /** Injected for tests so the loop runs without Typst. */
   render?: (doc: MergedResume, outDir: string) => string;
   pageCount?: (pdfPath: string) => number;
 }
 
-export interface OnePageResult {
+export interface RenderResult {
   pages: number;
   passes: number;
   pdfPath: string;
@@ -141,16 +202,17 @@ function dropLastBullets(doc: MergedResume): MergedResume {
 }
 
 /**
- * Render, then shrink until the PDF fits one page or `maxPasses` shrink attempts are used.
- * If it is still over one page the PDF is kept and the page count returned so the caller
- * can warn instead of throwing.
+ * Render, then shrink until the PDF fits the page target or `maxPasses` shrink attempts are
+ * used. It never shrinks below the target. If it is still over target the PDF is kept and the
+ * page count returned so the caller can warn instead of throwing.
  */
-export function renderOnePage(
+export function renderToPageTarget(
   doc: MergedResume,
   outDir: string,
+  target = 1,
   maxPasses = 3,
-  deps: RenderOnePageDeps = {},
-): OnePageResult {
+  deps: RenderToTargetDeps = {},
+): RenderResult {
   const render = deps.render ?? renderPdf;
   const pageCount = deps.pageCount ?? countPages;
 
@@ -159,7 +221,7 @@ export function renderOnePage(
   let pages = pageCount(pdfPath);
   let passes = 0;
 
-  while (pages > 1 && passes < maxPasses) {
+  while (pages > target && passes < maxPasses) {
     current = dropLastBullets(current);
     pdfPath = render(current, outDir);
     pages = pageCount(pdfPath);

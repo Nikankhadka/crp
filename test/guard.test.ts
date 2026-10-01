@@ -138,6 +138,28 @@ describe('guard', () => {
     expect(guard(result, bank)).toEqual([]);
   });
 
+  it('ignores bold markers in numbers and rewording', () => {
+    const result = tailored({
+      sections: [
+        {
+          type: 'experience',
+          items: [
+            {
+              itemId: 'exp-one',
+              bullets: [
+                {
+                  sourceId: 'exp-one-01',
+                  text: 'Built a platform used by about **20 clients** and cut effort by **70%**.',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(guard(result, bank)).toEqual([]);
+  });
+
   it('flags an invented number in the summary rewrite', () => {
     const violations = guard(tailored({ summaryRewrite: 'Served 99 clients.' }), bank);
     expect(violations.some((v) => v.rule === 'number')).toBe(true);

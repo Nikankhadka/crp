@@ -38,7 +38,8 @@ The default command runs score then tailor, merges the result against the bank (
 dates and tech always come from the bank), renders `templates/resume.typ` to a PDF, and drops
 trailing bullets to fit one page. It writes `out/local/<jd-slug>/v1/`: `score.json`,
 `resume.json`, `resume.pdf`, and `cover-letter.md` when the tailored result carries one, then
-prints the score, gaps, output directory and page count.
+prints the score, gaps, output directory and page count. The optional `pageTarget` key in
+`seed/me/profile.yaml` sets the page count the renderer shrinks toward (default `1`).
 
 Every tailored bullet cites a bank `sourceId`, and the guard rejects unknown ids, invented
 numbers, rewrites that drift from their source, unknown skills, and unsupported vocabulary

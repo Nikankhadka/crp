@@ -7,9 +7,10 @@ import type { Tailored } from '../src/core/schemas.js';
 import {
   countPages,
   mergeResume,
-  renderOnePage,
   renderPdf,
+  renderToPageTarget,
   slugify,
+  splitBold,
   type MergedResume,
 } from '../src/render/typst.js';
 
@@ -103,13 +104,43 @@ describe('mergeResume', () => {
   });
 });
 
-describe('renderOnePage', () => {
-  it('drops bullets one pass at a time until the page count is 1', () => {
+describe('splitBold', () => {
+  it('returns a single plain run when there are no markers', () => {
+    expect(splitBold('Built the thing')).toEqual([{ text: 'Built the thing', bold: false }]);
+  });
+
+  it('bolds the odd segment for one pair of markers', () => {
+    expect(splitBold('cut **70%+** in effort')).toEqual([
+      { text: 'cut ', bold: false },
+      { text: '70%+', bold: true },
+      { text: ' in effort', bold: false },
+    ]);
+  });
+
+  it('bolds every odd segment for multiple pairs', () => {
+    expect(splitBold('**a** and **b**')).toEqual([
+      { text: 'a', bold: true },
+      { text: ' and ', bold: false },
+      { text: 'b', bold: true },
+    ]);
+  });
+
+  it('keeps an unmatched marker literal without throwing', () => {
+    expect(splitBold('cut **70%')).toEqual([{ text: 'cut **70%', bold: false }]);
+  });
+
+  it('returns no runs for an empty string', () => {
+    expect(splitBold('')).toEqual([]);
+  });
+});
+
+describe('renderToPageTarget', () => {
+  it('target 1 drops bullets one pass at a time until the page count is 1', () => {
     const seen: MergedResume[] = [];
     let call = 0;
     const pages = [2, 1];
 
-    const result = renderOnePage(doc, '/tmp/out', 3, {
+    const result = renderToPageTarget(doc, '/tmp/out', 1, 3, {
       render: (current) => {
         seen.push(structuredClone(current));
         return `/tmp/out/pdf-${call++}`;
@@ -127,9 +158,32 @@ describe('renderOnePage', () => {
     expect(seen[1].sections[0].items[1].bullets).toHaveLength(1);
   });
 
+  it('target 2 does zero shrink passes when the render is already 2 pages', () => {
+    let calls = 0;
+    const result = renderToPageTarget(doc, '/tmp/out', 2, 3, {
+      render: () => `/tmp/out/pdf-${calls++}`,
+      pageCount: () => 2,
+    });
+
+    expect(result).toEqual({ pages: 2, passes: 0, pdfPath: '/tmp/out/pdf-0' });
+    expect(calls).toBe(1);
+  });
+
+  it('target 2 shrinks once when the render is 3 pages', () => {
+    let calls = 0;
+    const pages = [3, 2];
+    const result = renderToPageTarget(doc, '/tmp/out', 2, 3, {
+      render: () => `/tmp/out/pdf-${calls++}`,
+      pageCount: () => pages.shift() ?? 2,
+    });
+
+    expect(result).toEqual({ pages: 2, passes: 1, pdfPath: '/tmp/out/pdf-1' });
+    expect(calls).toBe(2);
+  });
+
   it('stops at maxPasses and returns the page count instead of throwing', () => {
     let calls = 0;
-    const result = renderOnePage(doc, '/tmp/out', 2, {
+    const result = renderToPageTarget(doc, '/tmp/out', 1, 2, {
       render: () => `/tmp/out/pdf-${calls++}`,
       pageCount: () => 2,
     });
@@ -158,18 +212,40 @@ function hasCommand(command: string, args: string[]): boolean {
 
 const hasTypst = hasCommand('typst', ['--version']);
 const hasPdfinfo = hasCommand('pdfinfo', ['-v']);
+const hasPdftotext = hasCommand('pdftotext', ['-v']);
 const maybe = hasTypst && hasPdfinfo ? describe : describe.skip;
 
 maybe('typst integration', () => {
-  it('renders the fixture document to a one-page PDF', () => {
+  it('renders bold markers as text and never prints literal asterisks', () => {
     // Typst is sandboxed to the repo root, so render inside out/ (gitignored), not the OS temp dir.
     const outBase = join(process.cwd(), 'out');
     mkdirSync(outBase, { recursive: true });
     const outDir = mkdtempSync(join(outBase, 'render-test-'));
     try {
-      const pdfPath = renderPdf(doc, outDir);
+      const boldDoc: MergedResume = {
+        ...doc,
+        summary: 'Rewritten **summary** marker.',
+        sections: doc.sections.map((section) => ({
+          ...section,
+          items: section.items.map((item) => ({
+            ...item,
+            bullets: item.bullets.map((bullet, index) =>
+              index === 0 ? { ...bullet, text: 'Tailored **bullet** one.' } : bullet,
+            ),
+          })),
+        })),
+      };
+
+      const pdfPath = renderPdf(boldDoc, outDir);
       expect(existsSync(pdfPath)).toBe(true);
       expect(countPages(pdfPath)).toBe(1);
+
+      if (hasPdftotext) {
+        const text = execFileSync('pdftotext', [pdfPath, '-'], { encoding: 'utf8' });
+        expect(text).not.toContain('**');
+        expect(text).toContain('summary');
+        expect(text).toContain('bullet');
+      }
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }

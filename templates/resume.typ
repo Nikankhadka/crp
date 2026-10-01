@@ -9,6 +9,14 @@
 
 #let field(obj, key) = obj.at(key, default: none)
 
+// Render the runs produced by the TypeScript splitBold helper: odd segments arrive as
+// `bold: true` and become strong spans, everything else stays plain text.
+#let rich(runs) = {
+  runs
+    .map(run => if run.at("bold", default: false) { strong(run.at("text", default: "")) } else { run.at("text", default: "") })
+    .join()
+}
+
 // Non-empty values for the listed keys, in order.
 #let present(obj, keys) = (
   keys
@@ -29,9 +37,9 @@
 ]
 
 #let summary = field(data, "summary")
-#if summary != none and summary != "" [
+#if summary != none and summary.len() > 0 [
   #v(0.35em)
-  #summary
+  #rich(summary)
 ]
 
 #for section in data.at("sections", default: ()) [
@@ -77,18 +85,18 @@
       ]
 
       #let itemText = field(item, "text")
-      #if itemText != none and itemText != "" [
+      #if itemText != none and itemText.len() > 0 [
         #linebreak()
-        #itemText
+        #rich(itemText)
       ]
 
-      #let bulletTexts = (
+      #let bulletRuns = (
         item.at("bullets", default: ())
-          .map(bullet => bullet.at("text", default: ""))
-          .filter(entry => entry != "")
+          .map(bullet => bullet.at("runs", default: ()))
+          .filter(runs => runs.len() > 0)
       )
-      #if bulletTexts.len() > 0 [
-        #list(..bulletTexts)
+      #if bulletRuns.len() > 0 [
+        #list(..bulletRuns.map(rich))
       ]
     ]
   ]

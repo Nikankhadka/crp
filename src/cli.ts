@@ -5,7 +5,7 @@ import { parse } from 'yaml';
 import { parseBank } from './core/bank.js';
 import { score } from './core/score.js';
 import { tailor } from './core/tailor.js';
-import { mergeResume, renderOnePage, slugify } from './render/typst.js';
+import { mergeResume, renderToPageTarget, slugify } from './render/typst.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -25,6 +25,10 @@ async function main(): Promise<void> {
 
   const seedDir = join(repoRoot, 'seed', 'me');
   const profile = parse(readFileSync(join(seedDir, 'profile.yaml'), 'utf8'));
+  // Default to one page when pageTarget is absent or not a positive integer.
+  const rawTarget = profile?.pageTarget;
+  const pageTarget =
+    typeof rawTarget === 'number' && Number.isInteger(rawTarget) && rawTarget >= 1 ? rawTarget : 1;
   const personal = readFileSync(join(seedDir, 'personal.md'), 'utf8');
   const bankText = readFileSync(join(seedDir, 'resume.yaml'), 'utf8');
   const bank = parseBank(bankText);
@@ -61,7 +65,7 @@ async function main(): Promise<void> {
     writeFileSync(join(outDir, 'cover-letter.md'), `${tailored.coverLetter}\n`);
   }
 
-  const { pages, passes } = renderOnePage(doc, outDir);
+  const { pages, passes } = renderToPageTarget(doc, outDir, pageTarget);
 
   process.stdout.write(
     [
@@ -71,8 +75,10 @@ async function main(): Promise<void> {
       `pages: ${pages}${passes > 0 ? ` (after ${passes} shrink pass${passes === 1 ? '' : 'es'})` : ''}`,
     ].join('\n') + '\n',
   );
-  if (pages > 1) {
-    process.stderr.write(`warning: resume is ${pages} pages after ${passes} shrink passes\n`);
+  if (pages > pageTarget) {
+    process.stderr.write(
+      `warning: resume is ${pages} pages after ${passes} shrink passes (target ${pageTarget})\n`,
+    );
   }
 }
 
