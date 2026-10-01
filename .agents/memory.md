@@ -32,8 +32,7 @@
 ## Gotchas
 
 - Typst 0.15 `json(sys.inputs.data)` loads the `--input` value as a file path itself, with no
-  `read()`. It sandboxes to the input file's directory, so `renderPdf` passes `--root /` and a
-  `realpathSync` absolute path. Without `--root`, the abs path fails through the `/tmp` symlink.
+  `read()`, and sandboxes to `--root`.
 - `context` is a reserved identifier in Typst; the template local is `contextText`.
 - Typst method chains (`.map().filter()`) must be wrapped in parentheses to span lines in code
   mode.
@@ -42,11 +41,12 @@
 - `.strict()` / `.passthrough()` still work in zod 4.6.5; `z.strictObject` is the explicit
   top-level form.
 - Typst 0.15 `json(sys.inputs.data)` resolves a relative path against the *calling file's*
-  directory (`templates/`), not the `--root`. A repo-relative path fails; a root-anchored path
-  (`data=/out/...`) with `--root <repoRoot>` works. That is why `renderPdf` passes
-  `data=/${relative(repoRoot, dataPath)}`.
-- Render integration tests must write inside the repo (`out/`), not the OS temp dir, because the
-  Typst `--root` sandbox rejects paths outside it.
+  directory, not the `--root`; a root-anchored path works. So `renderPdf` copies the template into
+  `outDir` as `resume.typ` and compiles with `--root outDir` and `data=/resume.json`. Rendering
+  therefore works from any writable dir (the OS temp dir on a read-only serverless deploy).
+- Page counting uses `pdf-lib` (pure JS); no system PDF tool is needed. The linux typst binary
+  comes from `scripts/fetch-typst.mjs` (pinned version and sha256) into gitignored `bin/`, and
+  `resolveTypstBin` copies it to the OS temp dir and chmods it because the deploy fs is read-only.
 - The reference document `03_job_application_MoE_system_prompt.md` contains a corrupted line
   ("Possibly inflate ownership, seniority or tenure") that the project memory says to ignore.
   Never propagate it.
@@ -67,7 +67,7 @@
 ## Conventions
 
 - Tests stay portable: bank/guard fixtures inline their YAML; CLI and render tests skip
-  cleanly when `seed/me/`, `typst` or `pdfinfo` are absent.
+  cleanly when `seed/me/` or `typst` are absent.
 - Prompts under `prompts/base` stay job-agnostic; the vocabulary blocklist test walks every
   `.md` file there, so adding a prompt file automatically extends the check. The blocklist
   includes "software", "engineer" and "developer", so ATS prose must avoid those words.

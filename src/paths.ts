@@ -18,8 +18,7 @@ function envPath(name: string, fallback: string): string {
 
 /**
  * Runtime paths, derived from APP_ROOT (default: cwd) so the CLI, tests and the Docker
- * standalone server all resolve the same directories. Storage defaults to `<appRoot>/storage`
- * and must stay inside `appRoot`: the Typst `--root` sandbox only sees paths under it.
+ * standalone server all resolve the same directories. Storage defaults to `<appRoot>/storage`.
  */
 export function resolvePaths(): Paths {
   const appRoot = envPath('APP_ROOT', process.cwd());

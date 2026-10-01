@@ -15,6 +15,7 @@ build/
 tsconfig.tsbuildinfo
 out/
 .vercel/
+/bin/
 
 # Data (user-specific, not committed)
 data/

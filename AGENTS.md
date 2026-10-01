@@ -13,6 +13,7 @@ src/core/           schemas.ts (zod), bank.ts (seed schema), guard.ts, prompt.ts
 src/providers/      llm.ts (OpenAI-compatible client with fallback and JSONL traces)
 src/render/         typst.ts (merge, render, one-page shrink loop)
 templates/          resume.typ (generic, ATS-safe single-column template)
+scripts/            fetch-typst.mjs (pinned linux typst binary into bin/, gitignored)
 src/cli.ts          the `[score|tailor] <jd.txt>` entry point
 seed/me/            personal seed bank: profile.yaml, resume.yaml, personal.md (gitignored)
 test/               vitest tests and fixtures (no network)
@@ -31,9 +32,12 @@ npx tsx src/cli.ts score <jd-file>      # debug: score only
 npx tsx src/cli.ts tailor <jd-file>     # debug: score + tailor JSON
 ```
 
-Rendering needs `typst` and poppler's `pdfinfo` on PATH (`brew install typst poppler`).
-The default command writes `out/local/<jd-slug>/v1/`: score.json, resume.json, resume.pdf,
-and cover-letter.md when the tailored result carries one.
+Rendering needs `typst` (`brew install typst`). The binary is resolved from `TYPST_BIN`, else
+`bin/typst-linux-x64` on linux (fetched by `node scripts/fetch-typst.mjs`, which `vercel-build`
+runs), else `typst` on PATH. Page counts are read in pure JS with `pdf-lib`; no system PDF tool is needed.
+The default command writes `out/local/<jd-slug>/v1/`: score.json, resume.json, resume.typ
+(the template copy typst compiles), resume.pdf, and cover-letter.md when the tailored result
+carries one.
 
 ## Conventions
 

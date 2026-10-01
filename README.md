@@ -10,7 +10,8 @@ universal prompt base, the anti-fabrication guard, and the Typst one-page render
 ## Requirements
 
 - Node 22 (`node --version` must print `v22.x`).
-- `typst` and poppler's `pdfinfo` on PATH for rendering (`brew install typst poppler`).
+- `typst` on PATH for rendering (`brew install typst`). On linux x64 hosts without it, run
+  `node scripts/fetch-typst.mjs` to download the pinned binary into `bin/`, or set `TYPST_BIN`.
 
 ## Setup
 

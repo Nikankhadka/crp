@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
+import { PDFDocument } from 'pdf-lib';
 import type { Bank, BankItem } from '../core/bank';
 import type { Tailored } from '../core/schemas';
 import { resolvePaths } from '../paths';
@@ -143,16 +145,49 @@ export function mergeResume(tailored: Tailored, bank: Bank): MergedResume {
 }
 
 export interface RenderOptions {
-  /** Typst sandbox root; must contain both the template and the output directory. */
-  root?: string;
   /** Template path override (tests). */
   templatePath?: string;
-  /** Typst binary override. */
+  /** Typst binary override; wins over `resolveTypstBin`. */
   bin?: string;
 }
 
+export interface TypstBinDeps {
+  env?: Record<string, string | undefined>;
+  platform?: NodeJS.Platform;
+  appRoot?: string;
+  tmpDir?: string;
+}
+
+let copiedBin: string | undefined;
+
 /**
- * Compile a merged doc into `<outDir>/resume.pdf`, writing `<outDir>/resume.json` first.
+ * Pick the typst executable: `TYPST_BIN`, else the binary bundled at `<appRoot>/bin/typst-linux-x64`
+ * (linux only), else `typst` from PATH. The deploy filesystem is read-only and may drop the exec
+ * bit, so the bundled binary is copied once per process into its own temp dir and made executable.
+ * A private dir means no other process can exec a half-written copy or hit ETXTBSY on it.
+ */
+export function resolveTypstBin(deps: TypstBinDeps = {}): string {
+  const fromEnv = (deps.env ?? process.env).TYPST_BIN;
+  if (fromEnv) return fromEnv;
+  if ((deps.platform ?? process.platform) !== 'linux') return 'typst';
+
+  const bundled = join(/*turbopackIgnore: true*/ deps.appRoot ?? resolvePaths().appRoot, 'bin', 'typst-linux-x64');
+  if (!existsSync(bundled)) return 'typst';
+
+  if (!copiedBin || !existsSync(/*turbopackIgnore: true*/ copiedBin)) {
+    const dir = mkdtempSync(join(/*turbopackIgnore: true*/ deps.tmpDir ?? tmpdir(), 'typst-'));
+    const target = join(dir, 'typst-linux-x64');
+    copyFileSync(bundled, target);
+    chmodSync(target, 0o755);
+    copiedBin = target;
+  }
+  return copiedBin;
+}
+
+/**
+ * Compile a merged doc into `<outDir>/resume.pdf`, writing `<outDir>/resume.json` and a copy of
+ * the template next to it first. Typst's root is `outDir` itself, so rendering needs no
+ * writable repo and works from any directory, such as the OS temp dir.
  * Async so a compile never blocks the server event loop.
  */
 export async function renderPdf(
@@ -161,35 +196,29 @@ export async function renderPdf(
   options: RenderOptions = {},
 ): Promise<string> {
   const paths = resolvePaths();
-  const root = options.root ?? paths.appRoot;
   const template = options.templatePath ?? join(/*turbopackIgnore: true*/ paths.templatesDir, 'resume.typ');
 
   mkdirSync(outDir, { recursive: true });
-  const dataPath = join(outDir, 'resume.json');
+  const dataPath = join(/*turbopackIgnore: true*/ outDir, 'resume.json');
+  const templateCopy = join(/*turbopackIgnore: true*/ outDir, 'resume.typ');
   const pdfPath = join(/*turbopackIgnore: true*/ outDir, 'resume.pdf');
   writeFileSync(dataPath, `${JSON.stringify(toRich(doc), null, 2)}\n`);
+  copyFileSync(template, templateCopy);
 
   // Typst's `json(sys.inputs.data)` loads the given path itself, scoped to the root set by
-  // `--root`. The root-anchored path keeps the sandbox closed: no absolute host path.
-  const dataRel = relative(root, dataPath);
-  if (dataRel.startsWith('..')) {
-    throw new Error(`render output must live under the typst root (${root}); got ${dataPath}`);
-  }
-
+  // `--root`. The root-anchored `/resume.json` keeps the sandbox closed: no absolute host path.
   await run(
-    options.bin ?? 'typst',
-    ['compile', template, pdfPath, '--input', `data=/${dataRel}`, '--root', root],
+    options.bin ?? resolveTypstBin(),
+    ['compile', templateCopy, pdfPath, '--input', 'data=/resume.json', '--root', outDir],
     { encoding: 'utf8' },
   );
   return pdfPath;
 }
 
-/** Count the pages of a PDF with poppler's pdfinfo. */
-export async function countPages(pdfPath: string, bin = 'pdfinfo'): Promise<number> {
-  const { stdout } = await run(bin, [pdfPath], { encoding: 'utf8' });
-  const match = stdout.match(/^Pages:\s+(\d+)/m);
-  if (!match) throw new Error('pdfinfo did not report a page count');
-  return Number(match[1]);
+/** Count the pages of a PDF in pure JS, so no system PDF tool is needed. */
+export async function countPages(pdfPath: string): Promise<number> {
+  const pdf = await PDFDocument.load(readFileSync(pdfPath), { updateMetadata: false });
+  return pdf.getPageCount();
 }
 
 export interface RenderToTargetDeps {

@@ -1,6 +1,16 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
+import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { parseBank, type Bank } from '../src/core/bank';
 import type { Tailored } from '../src/core/schemas';
@@ -9,6 +19,7 @@ import {
   mergeResume,
   renderPdf,
   renderToPageTarget,
+  resolveTypstBin,
   slugify,
   splitBold,
   type MergedResume,
@@ -202,42 +213,169 @@ describe('slugify', () => {
   });
 });
 
-const hasTypst = hasCommand('typst', ['--version']);
-const hasPdfinfo = hasCommand('pdfinfo', ['-v']);
-const hasPdftotext = hasCommand('pdftotext', ['-v']);
-const maybe = hasTypst && hasPdfinfo ? describe : describe.skip;
+/** A fresh scratch dir under the OS temp dir; the caller removes it. */
+function scratchDir(): string {
+  return mkdtempSync(join(tmpdir(), 'render-test-'));
+}
+
+async function writePdf(path: string, pages: number): Promise<void> {
+  const pdf = await PDFDocument.create();
+  for (let i = 0; i < pages; i += 1) pdf.addPage();
+  writeFileSync(path, await pdf.save());
+}
+
+describe('countPages', () => {
+  it('counts the pages of a PDF without any system tool', async () => {
+    const dir = scratchDir();
+    try {
+      await writePdf(join(dir, 'one.pdf'), 1);
+      await writePdf(join(dir, 'three.pdf'), 3);
+      expect(await countPages(join(dir, 'one.pdf'))).toBe(1);
+      expect(await countPages(join(dir, 'three.pdf'))).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a file that is not a PDF', async () => {
+    const dir = scratchDir();
+    try {
+      writeFileSync(join(dir, 'bad.pdf'), 'not a pdf');
+      await expect(countPages(join(dir, 'bad.pdf'))).rejects.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('resolveTypstBin', () => {
+  const bundledApp = (): string => {
+    const appRoot = scratchDir();
+    mkdirSync(join(appRoot, 'bin'));
+    writeFileSync(join(appRoot, 'bin', 'typst-linux-x64'), 'fake typst', { mode: 0o644 });
+    return appRoot;
+  };
+
+  it('prefers TYPST_BIN over everything', () => {
+    const appRoot = bundledApp();
+    try {
+      const bin = resolveTypstBin({ env: { TYPST_BIN: '/opt/typst' }, platform: 'linux', appRoot });
+      expect(bin).toBe('/opt/typst');
+    } finally {
+      rmSync(appRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('copies the bundled linux binary into a private temp dir, executable, and reuses the copy', () => {
+    const appRoot = bundledApp();
+    const tmpDir = scratchDir();
+    try {
+      const deps = { env: {}, platform: 'linux' as const, appRoot, tmpDir };
+      const bin = resolveTypstBin(deps);
+      expect(dirname(bin)).not.toBe(tmpDir);
+      expect(dirname(dirname(bin))).toBe(tmpDir);
+      expect(basename(bin)).toBe('typst-linux-x64');
+      expect(readFileSync(bin, 'utf8')).toBe('fake typst');
+      expect(statSync(bin).mode & 0o777).toBe(0o755);
+
+      // The cached path is reused: a changed source is not copied again.
+      writeFileSync(join(appRoot, 'bin', 'typst-linux-x64'), 'changed');
+      expect(resolveTypstBin(deps)).toBe(bin);
+      expect(readFileSync(bin, 'utf8')).toBe('fake typst');
+
+      // If the copy vanishes (temp dir cleaned), a fresh private dir is made.
+      rmSync(dirname(bin), { recursive: true });
+      const again = resolveTypstBin(deps);
+      expect(again).not.toBe(bin);
+      expect(dirname(dirname(again))).toBe(tmpDir);
+      expect(readFileSync(again, 'utf8')).toBe('changed');
+      expect(statSync(again).mode & 0o777).toBe(0o755);
+    } finally {
+      rmSync(appRoot, { recursive: true, force: true });
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to typst on PATH when not linux or when nothing is bundled', () => {
+    const appRoot = bundledApp();
+    const empty = scratchDir();
+    try {
+      expect(resolveTypstBin({ env: {}, platform: 'darwin', appRoot })).toBe('typst');
+      expect(resolveTypstBin({ env: {}, platform: 'linux', appRoot: empty })).toBe('typst');
+    } finally {
+      rmSync(appRoot, { recursive: true, force: true });
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+});
+
+const boldDoc: MergedResume = {
+  ...doc,
+  summary: 'Rewritten **summary** marker.',
+  sections: doc.sections.map((section) => ({
+    ...section,
+    items: section.items.map((item) => ({
+      ...item,
+      bullets: item.bullets.map((bullet, index) =>
+        index === 0 ? { ...bullet, text: 'Tailored **bullet** one.' } : bullet,
+      ),
+    })),
+  })),
+};
+
+describe('renderPdf', () => {
+  it('compiles from a copy of the template inside outDir, with outDir as the typst root', async () => {
+    const dir = scratchDir();
+    try {
+      const outDir = join(dir, 'out');
+      const bin = join(dir, 'fake-typst');
+      writeFileSync(bin, `#!/bin/sh\nprintf '%s\\n' "$@" > "${join(dir, 'args.txt')}"\n`);
+      chmodSync(bin, 0o755);
+
+      const pdfPath = await renderPdf(boldDoc, outDir, { bin });
+
+      expect(pdfPath).toBe(join(outDir, 'resume.pdf'));
+      expect(existsSync(join(outDir, 'resume.typ'))).toBe(true);
+
+      // Typst renders the JSON text verbatim, so no `**` in the data means none in the PDF.
+      const raw = readFileSync(join(outDir, 'resume.json'), 'utf8');
+      expect(raw).not.toContain('**');
+      const data = JSON.parse(raw);
+      expect(data.basics.name).toBe('Test Person');
+      expect(data.summary).toEqual([
+        { text: 'Rewritten ', bold: false },
+        { text: 'summary', bold: true },
+        { text: ' marker.', bold: false },
+      ]);
+      expect(data.sections[0].items[0].bullets[0].runs).toEqual([
+        { text: 'Tailored ', bold: false },
+        { text: 'bullet', bold: true },
+        { text: ' one.', bold: false },
+      ]);
+      expect(readFileSync(join(dir, 'args.txt'), 'utf8').trim().split('\n')).toEqual([
+        'compile',
+        join(outDir, 'resume.typ'),
+        pdfPath,
+        '--input',
+        'data=/resume.json',
+        '--root',
+        outDir,
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+const maybe = hasCommand(resolveTypstBin(), ['--version']) ? describe : describe.skip;
 
 maybe('typst integration', () => {
-  it('renders bold markers as text and never prints literal asterisks', async () => {
-    // Typst is sandboxed to the repo root, so render inside out/ (gitignored), not the OS temp dir.
-    const outBase = join(process.cwd(), 'out');
-    mkdirSync(outBase, { recursive: true });
-    const outDir = mkdtempSync(join(outBase, 'render-test-'));
+  it('renders into the OS temp dir and fits one page', async () => {
+    const outDir = scratchDir();
     try {
-      const boldDoc: MergedResume = {
-        ...doc,
-        summary: 'Rewritten **summary** marker.',
-        sections: doc.sections.map((section) => ({
-          ...section,
-          items: section.items.map((item) => ({
-            ...item,
-            bullets: item.bullets.map((bullet, index) =>
-              index === 0 ? { ...bullet, text: 'Tailored **bullet** one.' } : bullet,
-            ),
-          })),
-        })),
-      };
-
       const pdfPath = await renderPdf(boldDoc, outDir);
       expect(existsSync(pdfPath)).toBe(true);
       expect(await countPages(pdfPath)).toBe(1);
-
-      if (hasPdftotext) {
-        const text = execFileSync('pdftotext', [pdfPath, '-'], { encoding: 'utf8' });
-        expect(text).not.toContain('**');
-        expect(text).toContain('summary');
-        expect(text).toContain('bullet');
-      }
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }

@@ -8,9 +8,7 @@ import { VALID_SCORE } from './mock-server';
 const hasSeed = existsSync('seed/me/resume.yaml');
 const maybe = hasSeed ? describe : describe.skip;
 
-const hasRenderTools =
-  hasCommand('typst', ['--version']) && hasCommand('pdfinfo', ['-v']);
-const maybeRender = hasSeed && hasRenderTools ? describe : describe.skip;
+const maybeRender = hasSeed && hasCommand('typst', ['--version']) ? describe : describe.skip;
 
 interface RunResult {
   code: number | null;
