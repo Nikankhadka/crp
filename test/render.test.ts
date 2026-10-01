@@ -136,12 +136,12 @@ describe('splitBold', () => {
 });
 
 describe('renderToPageTarget', () => {
-  it('target 1 drops bullets one pass at a time until the page count is 1', () => {
+  it('target 1 drops bullets one pass at a time until the page count is 1', async () => {
     const seen: MergedResume[] = [];
     let call = 0;
     const pages = [2, 1];
 
-    const result = renderToPageTarget(doc, '/tmp/out', 1, 3, {
+    const result = await renderToPageTarget(doc, '/tmp/out', 1, 3, {
       render: (current) => {
         seen.push(structuredClone(current));
         return `/tmp/out/pdf-${call++}`;
@@ -159,9 +159,9 @@ describe('renderToPageTarget', () => {
     expect(seen[1].sections[0].items[1].bullets).toHaveLength(1);
   });
 
-  it('target 2 does zero shrink passes when the render is already 2 pages', () => {
+  it('target 2 does zero shrink passes when the render is already 2 pages', async () => {
     let calls = 0;
-    const result = renderToPageTarget(doc, '/tmp/out', 2, 3, {
+    const result = await renderToPageTarget(doc, '/tmp/out', 2, 3, {
       render: () => `/tmp/out/pdf-${calls++}`,
       pageCount: () => 2,
     });
@@ -170,10 +170,10 @@ describe('renderToPageTarget', () => {
     expect(calls).toBe(1);
   });
 
-  it('target 2 shrinks once when the render is 3 pages', () => {
+  it('target 2 shrinks once when the render is 3 pages', async () => {
     let calls = 0;
     const pages = [3, 2];
-    const result = renderToPageTarget(doc, '/tmp/out', 2, 3, {
+    const result = await renderToPageTarget(doc, '/tmp/out', 2, 3, {
       render: () => `/tmp/out/pdf-${calls++}`,
       pageCount: () => pages.shift() ?? 2,
     });
@@ -182,9 +182,9 @@ describe('renderToPageTarget', () => {
     expect(calls).toBe(2);
   });
 
-  it('stops at maxPasses and returns the page count instead of throwing', () => {
+  it('stops at maxPasses and returns the page count instead of throwing', async () => {
     let calls = 0;
-    const result = renderToPageTarget(doc, '/tmp/out', 1, 2, {
+    const result = await renderToPageTarget(doc, '/tmp/out', 1, 2, {
       render: () => `/tmp/out/pdf-${calls++}`,
       pageCount: () => 2,
     });
@@ -208,7 +208,7 @@ const hasPdftotext = hasCommand('pdftotext', ['-v']);
 const maybe = hasTypst && hasPdfinfo ? describe : describe.skip;
 
 maybe('typst integration', () => {
-  it('renders bold markers as text and never prints literal asterisks', () => {
+  it('renders bold markers as text and never prints literal asterisks', async () => {
     // Typst is sandboxed to the repo root, so render inside out/ (gitignored), not the OS temp dir.
     const outBase = join(process.cwd(), 'out');
     mkdirSync(outBase, { recursive: true });
@@ -228,9 +228,9 @@ maybe('typst integration', () => {
         })),
       };
 
-      const pdfPath = renderPdf(boldDoc, outDir);
+      const pdfPath = await renderPdf(boldDoc, outDir);
       expect(existsSync(pdfPath)).toBe(true);
-      expect(countPages(pdfPath)).toBe(1);
+      expect(await countPages(pdfPath)).toBe(1);
 
       if (hasPdftotext) {
         const text = execFileSync('pdftotext', [pdfPath, '-'], { encoding: 'utf8' });

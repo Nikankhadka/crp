@@ -7,6 +7,7 @@ export interface ScoreInput {
   bank: string;
   job: string;
   descriptionIsFull: boolean;
+  docs?: string;
   research?: string;
 }
 
@@ -24,6 +25,7 @@ export async function score(input: ScoreInput): Promise<Score> {
     personal: input.personal,
     bank: input.bank,
     job,
+    docs: input.docs,
     research: input.research,
   });
 

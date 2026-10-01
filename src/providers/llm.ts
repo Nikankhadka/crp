@@ -1,20 +1,16 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import OpenAI, {
   APIConnectionError,
   APIConnectionTimeoutError,
   APIError,
 } from 'openai';
-
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const tracePath = join(repoRoot, 'traces', 'llm-calls.jsonl');
+import { resolvePaths } from '../paths';
 
 // Node 22 built-in. .env is optional; real environment variables take precedence.
-// Resolved from the repo root (same logic as cli.ts) so the client loads the same file no
-// matter which directory the process runs from.
+// Next.js loads .env itself in dev/build, so this only matters for the tsx CLI.
 try {
-  process.loadEnvFile(join(repoRoot, '.env'));
+  process.loadEnvFile(join(resolvePaths().appRoot, '.env'));
 } catch {
   // no .env file, use the ambient environment
 }
@@ -74,6 +70,7 @@ interface TraceRecord {
 }
 
 function writeTrace(record: TraceRecord): void {
+  const tracePath = join(resolvePaths().tracesDir, 'llm-calls.jsonl');
   mkdirSync(dirname(tracePath), { recursive: true });
   appendFileSync(tracePath, `${JSON.stringify(record)}\n`);
 }

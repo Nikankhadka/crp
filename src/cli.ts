@@ -1,13 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { parse } from 'yaml';
-import { parseBank } from './core/bank';
+import { join } from 'node:path';
 import { score } from './core/score';
 import { tailor } from './core/tailor';
+import { resolvePaths } from './paths';
 import { mergeResume, renderToPageTarget, slugify } from './render/typst';
-
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { loadSeed } from './server/seedBank';
 
 const USAGE =
   'Usage: tsx src/cli.ts <jd-file>\n' +
@@ -23,20 +20,16 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const seedDir = join(repoRoot, 'seed', 'me');
-  const profile = parse(readFileSync(join(seedDir, 'profile.yaml'), 'utf8'));
-  // Default to one page when pageTarget is absent or not a positive integer.
-  const rawTarget = profile?.pageTarget;
-  const pageTarget =
-    typeof rawTarget === 'number' && Number.isInteger(rawTarget) && rawTarget >= 1 ? rawTarget : 1;
-  const personal = readFileSync(join(seedDir, 'personal.md'), 'utf8');
-  const bankText = readFileSync(join(seedDir, 'resume.yaml'), 'utf8');
-  const bank = parseBank(bankText);
+  const paths = resolvePaths();
+  const seed = loadSeed(paths.seedDir);
   const job = readFileSync(jdPath, 'utf8');
 
-  const personalLayer = `profile.yaml:\n${JSON.stringify(profile, null, 2)}\n\npersonal.md:\n${personal}`;
-
-  const scored = await score({ personal: personalLayer, bank: bankText, job, descriptionIsFull: true });
+  const scored = await score({
+    personal: seed.personalLayer,
+    bank: seed.bankText,
+    job,
+    descriptionIsFull: true,
+  });
 
   if (command === 'score') {
     process.stdout.write(`${JSON.stringify(scored, null, 2)}\n`);
@@ -44,9 +37,9 @@ async function main(): Promise<void> {
   }
 
   const tailored = await tailor({
-    personal: personalLayer,
-    bank,
-    bankText,
+    personal: seed.personalLayer,
+    bank: seed.bank,
+    bankText: seed.bankText,
     job,
     score: scored,
     descriptionIsFull: true,
@@ -57,15 +50,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  const doc = mergeResume(tailored, bank);
-  const outDir = join(repoRoot, 'out', 'local', slugify(jdPath), 'v1');
+  const doc = mergeResume(tailored, seed.bank);
+  const outDir = join(paths.appRoot, 'out', 'local', slugify(jdPath), 'v1');
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'score.json'), `${JSON.stringify(scored, null, 2)}\n`);
   if (tailored.coverLetter) {
     writeFileSync(join(outDir, 'cover-letter.md'), `${tailored.coverLetter}\n`);
   }
 
-  const { pages, passes } = renderToPageTarget(doc, outDir, pageTarget);
+  const { pages, passes } = await renderToPageTarget(doc, outDir, seed.pageTarget);
 
   process.stdout.write(
     [
@@ -75,9 +68,9 @@ async function main(): Promise<void> {
       `pages: ${pages}${passes > 0 ? ` (after ${passes} shrink pass${passes === 1 ? '' : 'es'})` : ''}`,
     ].join('\n') + '\n',
   );
-  if (pages > pageTarget) {
+  if (pages > seed.pageTarget) {
     process.stderr.write(
-      `warning: resume is ${pages} pages after ${passes} shrink passes (target ${pageTarget})\n`,
+      `warning: resume is ${pages} pages after ${passes} shrink passes (target ${seed.pageTarget})\n`,
     );
   }
 }

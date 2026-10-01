@@ -10,6 +10,7 @@ export interface TailorInput {
   bankText: string;
   job: string;
   score: Score;
+  docs?: string;
   research?: string;
   descriptionIsFull: boolean;
   vocabulary?: string[];
@@ -52,6 +53,7 @@ export async function tailor(input: TailorInput): Promise<Tailored> {
     personal: input.personal,
     bank: input.bankText,
     job,
+    docs: input.docs,
     research: input.research,
   });
 

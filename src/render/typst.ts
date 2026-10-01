@@ -1,12 +1,12 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename, join, relative } from 'node:path';
+import { promisify } from 'node:util';
 import type { Bank, BankItem } from '../core/bank';
 import type { Tailored } from '../core/schemas';
+import { resolvePaths } from '../paths';
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const templatePath = join(repoRoot, 'templates', 'resume.typ');
+const run = promisify(execFile);
 
 export interface MergedBullet {
   id: string;
@@ -142,44 +142,60 @@ export function mergeResume(tailored: Tailored, bank: Bank): MergedResume {
   };
 }
 
-/** Compile a merged doc into `<outDir>/resume.pdf`, writing `<outDir>/resume.json` first. */
-export function renderPdf(doc: MergedResume, outDir: string): string {
+export interface RenderOptions {
+  /** Typst sandbox root; must contain both the template and the output directory. */
+  root?: string;
+  /** Template path override (tests). */
+  templatePath?: string;
+  /** Typst binary override. */
+  bin?: string;
+}
+
+/**
+ * Compile a merged doc into `<outDir>/resume.pdf`, writing `<outDir>/resume.json` first.
+ * Async so a compile never blocks the server event loop.
+ */
+export async function renderPdf(
+  doc: MergedResume,
+  outDir: string,
+  options: RenderOptions = {},
+): Promise<string> {
+  const paths = resolvePaths();
+  const root = options.root ?? paths.appRoot;
+  const template = options.templatePath ?? join(paths.templatesDir, 'resume.typ');
+
   mkdirSync(outDir, { recursive: true });
   const dataPath = join(outDir, 'resume.json');
   const pdfPath = join(outDir, 'resume.pdf');
   writeFileSync(dataPath, `${JSON.stringify(toRich(doc), null, 2)}\n`);
 
-  // Typst's `json(sys.inputs.data)` loads the given path itself, scoped to the project root set
-  // by `--root`. A root-anchored path keeps the repo as the sandbox: no `--root /`, no absolute
-  // host path. Data lives under out/ inside the repo, so the repo-relative path is valid.
-  execFileSync(
-    'typst',
-    [
-      'compile',
-      templatePath,
-      pdfPath,
-      '--input',
-      `data=/${relative(repoRoot, dataPath)}`,
-      '--root',
-      repoRoot,
-    ],
-    { stdio: 'pipe' },
+  // Typst's `json(sys.inputs.data)` loads the given path itself, scoped to the root set by
+  // `--root`. The root-anchored path keeps the sandbox closed: no absolute host path.
+  const dataRel = relative(root, dataPath);
+  if (dataRel.startsWith('..')) {
+    throw new Error(`render output must live under the typst root (${root}); got ${dataPath}`);
+  }
+
+  await run(
+    options.bin ?? 'typst',
+    ['compile', template, pdfPath, '--input', `data=/${dataRel}`, '--root', root],
+    { encoding: 'utf8' },
   );
   return pdfPath;
 }
 
 /** Count the pages of a PDF with poppler's pdfinfo. */
-export function countPages(pdfPath: string): number {
-  const output = execFileSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
-  const match = output.match(/^Pages:\s+(\d+)/m);
+export async function countPages(pdfPath: string, bin = 'pdfinfo'): Promise<number> {
+  const { stdout } = await run(bin, [pdfPath], { encoding: 'utf8' });
+  const match = stdout.match(/^Pages:\s+(\d+)/m);
   if (!match) throw new Error('pdfinfo did not report a page count');
   return Number(match[1]);
 }
 
 export interface RenderToTargetDeps {
   /** Injected for tests so the loop runs without Typst. */
-  render?: (doc: MergedResume, outDir: string) => string;
-  pageCount?: (pdfPath: string) => number;
+  render?: (doc: MergedResume, outDir: string) => string | Promise<string>;
+  pageCount?: (pdfPath: string) => number | Promise<number>;
 }
 
 export interface RenderResult {
@@ -206,25 +222,25 @@ function dropLastBullets(doc: MergedResume): MergedResume {
  * used. It never shrinks below the target. If it is still over target the PDF is kept and the
  * page count returned so the caller can warn instead of throwing.
  */
-export function renderToPageTarget(
+export async function renderToPageTarget(
   doc: MergedResume,
   outDir: string,
   target = 1,
   maxPasses = 3,
   deps: RenderToTargetDeps = {},
-): RenderResult {
+): Promise<RenderResult> {
   const render = deps.render ?? renderPdf;
   const pageCount = deps.pageCount ?? countPages;
 
   let current = doc;
-  let pdfPath = render(current, outDir);
-  let pages = pageCount(pdfPath);
+  let pdfPath = await render(current, outDir);
+  let pages = await pageCount(pdfPath);
   let passes = 0;
 
   while (pages > target && passes < maxPasses) {
     current = dropLastBullets(current);
-    pdfPath = render(current, outDir);
-    pages = pageCount(pdfPath);
+    pdfPath = await render(current, outDir);
+    pages = await pageCount(pdfPath);
     passes += 1;
   }
 
