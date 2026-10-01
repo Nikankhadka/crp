@@ -74,7 +74,7 @@ function metaFor(category: DocCategory, slug: string, content: string, updatedAt
 }
 
 function docPath(category: DocCategory, slug: string): string {
-  return join(docsRoot(), category, `${slug}.md`);
+  return join(/*turbopackIgnore: true*/ docsRoot(), category, `${slug}.md`);
 }
 
 /** Create or overwrite a doc. Throws DocTooLargeError past MAX_DOC_BYTES. */

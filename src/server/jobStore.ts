@@ -123,6 +123,6 @@ export function deleteJob(id: string): boolean {
 /** Absolute path for a job artifact, or null when the name is unknown or the file is absent. */
 export function artifactPath(id: string, name: ArtifactName): string | null {
   if (!isSafeId(id)) return null;
-  const file = join(jobDir(id), ARTIFACT_FILES[name]);
+  const file = join(/*turbopackIgnore: true*/ jobDir(id), ARTIFACT_FILES[name]);
   return existsSync(file) ? file : null;
 }

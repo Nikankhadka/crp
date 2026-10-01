@@ -162,11 +162,11 @@ export async function renderPdf(
 ): Promise<string> {
   const paths = resolvePaths();
   const root = options.root ?? paths.appRoot;
-  const template = options.templatePath ?? join(paths.templatesDir, 'resume.typ');
+  const template = options.templatePath ?? join(/*turbopackIgnore: true*/ paths.templatesDir, 'resume.typ');
 
   mkdirSync(outDir, { recursive: true });
   const dataPath = join(outDir, 'resume.json');
-  const pdfPath = join(outDir, 'resume.pdf');
+  const pdfPath = join(/*turbopackIgnore: true*/ outDir, 'resume.pdf');
   writeFileSync(dataPath, `${JSON.stringify(toRich(doc), null, 2)}\n`);
 
   // Typst's `json(sys.inputs.data)` loads the given path itself, scoped to the root set by

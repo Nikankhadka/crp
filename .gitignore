@@ -12,6 +12,7 @@ node_modules/
 dist/
 build/
 .next/
+tsconfig.tsbuildinfo
 out/
 .vercel/
 

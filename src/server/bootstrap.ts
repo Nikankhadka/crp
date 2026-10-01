@@ -16,14 +16,14 @@ const SEED_FILES = ['profile.yaml', 'resume.yaml', 'personal.md'];
 /** Copy the personal seed into SEED_DIR when the volume is empty and a bootstrap source is set. */
 export function ensureSeed(): void {
   const { seedDir } = resolvePaths();
-  if (existsSync(join(seedDir, 'resume.yaml'))) return;
+  if (existsSync(join(/*turbopackIgnore: true*/ seedDir, 'resume.yaml'))) return;
   const source = process.env.BOOTSTRAP_SEED_DIR;
   if (!source || source === '') return;
   for (const file of SEED_FILES) {
-    const from = join(source, file);
+    const from = join(/*turbopackIgnore: true*/ source, file);
     if (!existsSync(from)) continue;
     mkdirSync(seedDir, { recursive: true });
-    copyFileSync(from, join(seedDir, file));
+    copyFileSync(from, join(/*turbopackIgnore: true*/ seedDir, file));
   }
 }
 
@@ -81,7 +81,7 @@ export function ensureDocs(): void {
   const source = process.env.BOOTSTRAP_DOCS_DIR;
   if (!source || source === '') return;
   for (const doc of DOC_BOOTSTRAP_MAP) {
-    const from = join(source, doc.file);
+    const from = join(/*turbopackIgnore: true*/ source, doc.file);
     if (!existsSync(from)) continue;
     upsertDoc(doc.category, doc.slug, readFileSync(from, 'utf8'));
   }
