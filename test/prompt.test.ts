@@ -20,6 +20,26 @@ describe('buildPrompt', () => {
     expect(user).toContain('<research>\nR\n</research>');
   });
 
+  it('omits docs entirely when absent', () => {
+    const { user } = buildPrompt({ task: 'score', personal: 'P', bank: 'B', job: 'J' });
+    expect(user).not.toContain('<docs>');
+  });
+
+  it('places docs between bank and research, before the job', () => {
+    const { user } = buildPrompt({
+      task: 'score',
+      personal: 'P',
+      bank: 'B',
+      docs: 'D',
+      research: 'R',
+      job: 'J',
+    });
+    expect(user).toContain('<docs>\nD\n</docs>');
+    expect(user.indexOf('<bank>')).toBeLessThan(user.indexOf('<docs>'));
+    expect(user.indexOf('<docs>')).toBeLessThan(user.indexOf('<research>'));
+    expect(user.indexOf('<research>')).toBeLessThan(user.indexOf('<job>'));
+  });
+
   it('system equals the concatenation of the two base files', () => {
     const system = readFileSync('prompts/base/system.md', 'utf8');
     const task = readFileSync('prompts/base/score.md', 'utf8');

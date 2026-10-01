@@ -13,6 +13,9 @@ Produce a tailored resume selection from the personal bank. Return JSON only.
 - `skillsOrder` may only reorder skills that already exist in the bank. Never add a skill.
 - List every requirement in the advertisement the bank does not evidence under `gaps`.
   Do not invent evidence to fill a gap.
+- When a `<docs>` block is present it is background reference only. Use it to choose which
+  bank facts to foreground and how to phrase them; never take a fact, figure, date or claim
+  from it, and never let it change a bullet's meaning or numbers.
 
 ## Personal layer
 

@@ -15,6 +15,9 @@ Score the job advertisement against the personal layer. Return JSON only.
 ## Rules
 
 - Compare only against facts in the personal layer. Do not assume anything not stated.
+- When a `<docs>` block is present it is background reference only. It may inform which
+  strengths to emphasise and how to phrase `oneLineWhy`, but never add, change or score a
+  fact; every fact still comes from the personal layer.
 - Roles that require citizenship, permanent residency (PR) or a security clearance are hard
   blockers. So are roles whose hard requirements are all in the personal layer's
   never-mention list. State the blocker in both `redFlags` and `mustHavesMissing` and score
