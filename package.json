@@ -6,6 +6,9 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "cli": "tsx src/cli.ts"
