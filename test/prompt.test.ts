@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { buildPrompt } from '../src/core/prompt.js';
+import { buildPrompt } from '../src/core/prompt';
 
 describe('buildPrompt', () => {
   it('includes the personal, bank and job tags', () => {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { score } from '../src/core/score.js';
-import { clearLlmEnv, closeServers, setPrimaryEnv, startServer } from './helpers.js';
-import { VALID_SCORE } from './mock-server.js';
+import { score } from '../src/core/score';
+import { clearLlmEnv, closeServers, setPrimaryEnv, startServer } from './helpers';
+import { VALID_SCORE } from './mock-server';
 
 const input = { personal: 'P', bank: 'B', job: 'J', descriptionIsFull: true };
 

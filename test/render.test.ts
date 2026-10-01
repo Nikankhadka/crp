@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseBank, type Bank } from '../src/core/bank.js';
-import type { Tailored } from '../src/core/schemas.js';
+import { parseBank, type Bank } from '../src/core/bank';
+import type { Tailored } from '../src/core/schemas';
 import {
   countPages,
   mergeResume,
@@ -12,8 +12,8 @@ import {
   slugify,
   splitBold,
   type MergedResume,
-} from '../src/render/typst.js';
-import { hasCommand } from './helpers.js';
+} from '../src/render/typst';
+import { hasCommand } from './helpers';
 
 const bank: Bank = parseBank(`
 basics:

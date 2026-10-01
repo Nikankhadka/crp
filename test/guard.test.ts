@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseBank, type Bank } from '../src/core/bank.js';
-import { guard } from '../src/core/guard.js';
-import type { Tailored } from '../src/core/schemas.js';
+import { parseBank, type Bank } from '../src/core/bank';
+import { guard } from '../src/core/guard';
+import type { Tailored } from '../src/core/schemas';
 
 const bank: Bank = parseBank(`
 summaries:

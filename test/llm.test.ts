@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { completeJson } from '../src/providers/llm.js';
-import { clearLlmEnv, closeServers, setPrimaryEnv, startServer } from './helpers.js';
-import { VALID_SCORE } from './mock-server.js';
+import { completeJson } from '../src/providers/llm';
+import { clearLlmEnv, closeServers, setPrimaryEnv, startServer } from './helpers';
+import { VALID_SCORE } from './mock-server';
 
 function setFallback(url: string): void {
   process.env.LLM_FALLBACK_BASE_URL = url;

@@ -1,6 +1,6 @@
-import { completeJson } from '../providers/llm.js';
-import { buildPrompt } from './prompt.js';
-import { formatIssues, ScoreSchema, type Score } from './schemas.js';
+import { completeJson } from '../providers/llm';
+import { buildPrompt } from './prompt';
+import { formatIssues, ScoreSchema, type Score } from './schemas';
 
 export interface ScoreInput {
   personal: string;

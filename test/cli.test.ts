@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { closeServers, hasCommand, startServer } from './helpers.js';
-import { VALID_SCORE } from './mock-server.js';
+import { closeServers, hasCommand, startServer } from './helpers';
+import { VALID_SCORE } from './mock-server';
 
 const hasSeed = existsSync('seed/me/resume.yaml');
 const maybe = hasSeed ? describe : describe.skip;

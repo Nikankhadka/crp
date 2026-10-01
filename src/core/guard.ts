@@ -1,5 +1,5 @@
-import type { Bank } from './bank.js';
-import type { Tailored } from './schemas.js';
+import type { Bank } from './bank';
+import type { Tailored } from './schemas';
 
 export type GuardRule =
   | 'itemId'

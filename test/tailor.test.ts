@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { parseBank, type Bank } from '../src/core/bank.js';
-import type { Tailored } from '../src/core/schemas.js';
-import { tailor } from '../src/core/tailor.js';
-import { clearLlmEnv, closeServers, setPrimaryEnv, startServer } from './helpers.js';
+import { parseBank, type Bank } from '../src/core/bank';
+import type { Tailored } from '../src/core/schemas';
+import { tailor } from '../src/core/tailor';
+import { clearLlmEnv, closeServers, setPrimaryEnv, startServer } from './helpers';
 
 const bankText = `
 summaries:

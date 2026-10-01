@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBank } from '../src/core/bank.js';
+import { parseBank } from '../src/core/bank';
 
 // A small fixture shaped like seed/me/resume.yaml, so tests stay portable.
 const fixture = `

@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Bank, BankItem } from '../core/bank.js';
-import type { Tailored } from '../core/schemas.js';
+import type { Bank, BankItem } from '../core/bank';
+import type { Tailored } from '../core/schemas';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const templatePath = join(repoRoot, 'templates', 'resume.typ');

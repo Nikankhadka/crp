@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { createMockServer, type MockHandler, type MockServer } from './mock-server.js';
+import { createMockServer, type MockHandler, type MockServer } from './mock-server';
 
 const liveServers: MockServer[] = [];
 

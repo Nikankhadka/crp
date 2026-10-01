@@ -2,10 +2,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
-import { parseBank } from './core/bank.js';
-import { score } from './core/score.js';
-import { tailor } from './core/tailor.js';
-import { mergeResume, renderToPageTarget, slugify } from './render/typst.js';
+import { parseBank } from './core/bank';
+import { score } from './core/score';
+import { tailor } from './core/tailor';
+import { mergeResume, renderToPageTarget, slugify } from './render/typst';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 

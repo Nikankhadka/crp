@@ -1,8 +1,8 @@
-import { completeJson } from '../providers/llm.js';
-import { type Bank } from './bank.js';
-import { guard, type Violation } from './guard.js';
-import { buildPrompt } from './prompt.js';
-import { formatIssues, TailorSchema, type Score, type Tailored } from './schemas.js';
+import { completeJson } from '../providers/llm';
+import { type Bank } from './bank';
+import { guard, type Violation } from './guard';
+import { buildPrompt } from './prompt';
+import { formatIssues, TailorSchema, type Score, type Tailored } from './schemas';
 
 export interface TailorInput {
   personal: string;

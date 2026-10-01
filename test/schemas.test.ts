@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ScoreSchema, TailorSchema } from '../src/core/schemas.js';
+import { ScoreSchema, TailorSchema } from '../src/core/schemas';
 
 const valid = {
   score: 80,
