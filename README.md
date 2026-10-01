@@ -15,9 +15,20 @@ universal prompt base, the anti-fabrication guard, and the Typst one-page render
 ## Setup
 
 ```bash
-cp .env.example .env   # then fill in your provider keys
+cp .env.example .env   # then add your OpenCode Zen key
 npm install
 ```
+
+A single OpenCode Zen key is enough. Set it as `LLM_API_KEY`, or as `OPENCODE_API_KEY` (an
+alias for the same key). The app defaults to the free Zen gateway
+(`https://opencode.ai/zen/v1`) and the free model `nemotron-3.5-lightning-free`, so no other
+configuration is required. Set `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` or
+`OPENCODE_API_KEY` to override those defaults.
+
+The free model pool rotates, so when a model is retired switch it with an env change rather
+than a code change. An optional fallback (`LLM_FALLBACK_MODEL`, defaulting to the free
+`nemotron-3-ultra-free`; base URL and key default to the primary) is used once when the
+primary returns 429, 5xx or times out.
 
 ## Commands
 

@@ -31,20 +31,33 @@ function timeoutMs(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : 90_000;
 }
 
+// Free OpenCode Zen defaults. A single key (LLM_API_KEY or its OPENCODE_API_KEY alias) is
+// enough; every setting can still be overridden with an explicit env var.
+const DEFAULT_BASE_URL = 'https://opencode.ai/zen/v1';
+const DEFAULT_PRIMARY_MODEL = 'nemotron-3.5-lightning-free';
+const DEFAULT_FALLBACK_MODEL = 'nemotron-3-ultra-free';
+
 function primaryConfig(): ProviderConfig | null {
-  const { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL } = process.env;
-  if (!LLM_BASE_URL || !LLM_API_KEY || !LLM_MODEL) return null;
-  return { provider: 'primary', baseURL: LLM_BASE_URL, apiKey: LLM_API_KEY, model: LLM_MODEL };
+  const apiKey = process.env.LLM_API_KEY ?? process.env.OPENCODE_API_KEY;
+  if (!apiKey) return null;
+  return {
+    provider: 'primary',
+    baseURL: process.env.LLM_BASE_URL ?? DEFAULT_BASE_URL,
+    apiKey,
+    model: process.env.LLM_MODEL ?? DEFAULT_PRIMARY_MODEL,
+  };
 }
 
-function fallbackConfig(): ProviderConfig | null {
+// Active only when the caller asked for one, so custom setups keep the no-fallback behavior.
+// The base URL and key default to the effective primary values.
+function fallbackConfig(primary: ProviderConfig): ProviderConfig | null {
   const { LLM_FALLBACK_BASE_URL, LLM_FALLBACK_API_KEY, LLM_FALLBACK_MODEL } = process.env;
-  if (!LLM_FALLBACK_BASE_URL || !LLM_FALLBACK_API_KEY || !LLM_FALLBACK_MODEL) return null;
+  if (!LLM_FALLBACK_BASE_URL && !LLM_FALLBACK_MODEL) return null;
   return {
     provider: 'fallback',
-    baseURL: LLM_FALLBACK_BASE_URL,
-    apiKey: LLM_FALLBACK_API_KEY,
-    model: LLM_FALLBACK_MODEL,
+    baseURL: LLM_FALLBACK_BASE_URL ?? primary.baseURL,
+    apiKey: LLM_FALLBACK_API_KEY ?? primary.apiKey,
+    model: LLM_FALLBACK_MODEL ?? DEFAULT_FALLBACK_MODEL,
   };
 }
 
@@ -139,13 +152,13 @@ async function attempt(
  */
 export async function completeJson(task: string, system: string, user: string): Promise<unknown> {
   const primary = primaryConfig();
-  if (!primary) throw new Error('Missing LLM_BASE_URL, LLM_API_KEY or LLM_MODEL');
+  if (!primary) throw new Error('Missing LLM_API_KEY or OPENCODE_API_KEY');
 
   try {
     return parseJson(await attempt(task, primary, system, user));
   } catch (err) {
     if (!isRetryable(err)) throw err;
-    const fallback = fallbackConfig();
+    const fallback = fallbackConfig(primary);
     if (!fallback) throw err;
     return parseJson(await attempt(task, fallback, system, user));
   }

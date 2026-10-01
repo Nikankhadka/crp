@@ -11,6 +11,7 @@ const servers: MockServer[] = [];
 const LLM_KEYS = [
   'LLM_BASE_URL',
   'LLM_API_KEY',
+  'OPENCODE_API_KEY',
   'LLM_MODEL',
   'LLM_FALLBACK_BASE_URL',
   'LLM_FALLBACK_API_KEY',
@@ -79,5 +80,77 @@ describe('completeJson', () => {
     const primary = await start(() => ({ status: 503 }));
     setPrimary(primary.url);
     await expect(completeJson('score', 'sys', 'usr')).rejects.toThrow();
+  });
+
+  it('defaults to the free Zen model when only OPENCODE_API_KEY is set', async () => {
+    let seenModel: unknown;
+    const primary = await start((body) => {
+      seenModel = (body as { model?: unknown }).model;
+      return { content: JSON.stringify(VALID_SCORE) };
+    });
+    process.env.LLM_BASE_URL = primary.url;
+    process.env.OPENCODE_API_KEY = 'test-key';
+    await expect(completeJson('score', 'sys', 'usr')).resolves.toEqual(VALID_SCORE);
+    expect(seenModel).toBe('nemotron-3.5-lightning-free');
+  });
+
+  it('lets explicit LLM_MODEL and LLM_BASE_URL override the defaults', async () => {
+    let seenModel: unknown;
+    const primary = await start((body) => {
+      seenModel = (body as { model?: unknown }).model;
+      return { content: JSON.stringify(VALID_SCORE) };
+    });
+    process.env.LLM_BASE_URL = primary.url;
+    process.env.OPENCODE_API_KEY = 'test-key';
+    process.env.LLM_MODEL = 'custom-model';
+    await expect(completeJson('score', 'sys', 'usr')).resolves.toEqual(VALID_SCORE);
+    expect(seenModel).toBe('custom-model');
+  });
+
+  it('names both accepted key env vars when no key is configured', async () => {
+    delete process.env.LLM_API_KEY;
+    delete process.env.OPENCODE_API_KEY;
+    await expect(completeJson('score', 'sys', 'usr')).rejects.toThrow(
+      'Missing LLM_API_KEY or OPENCODE_API_KEY',
+    );
+  });
+
+  it('activates the fallback from LLM_FALLBACK_MODEL and reuses the primary URL and key', async () => {
+    let seenAuth: string | undefined;
+    const primary = await start((_body, callIndex, headers) => {
+      seenAuth = headers.authorization;
+      return callIndex === 0 ? { status: 500 } : { content: JSON.stringify(VALID_SCORE) };
+    });
+    process.env.LLM_BASE_URL = primary.url;
+    process.env.LLM_API_KEY = 'primary-key';
+    process.env.LLM_FALLBACK_MODEL = 'mock-fallback';
+    await expect(completeJson('score', 'sys', 'usr')).resolves.toEqual(VALID_SCORE);
+    expect(seenAuth).toBe('Bearer primary-key');
+  });
+
+  it('uses LLM_FALLBACK_API_KEY when provided', async () => {
+    const primary = await start(() => ({ status: 500 }));
+    let fallbackAuth: string | undefined;
+    const fallback = await start((_body, _call, headers) => {
+      fallbackAuth = headers.authorization;
+      return { content: JSON.stringify(VALID_SCORE) };
+    });
+    setPrimary(primary.url);
+    process.env.LLM_FALLBACK_BASE_URL = fallback.url;
+    process.env.LLM_FALLBACK_MODEL = 'mock-fallback';
+    process.env.LLM_FALLBACK_API_KEY = 'fallback-key';
+    await expect(completeJson('score', 'sys', 'usr')).resolves.toEqual(VALID_SCORE);
+    expect(fallbackAuth).toBe('Bearer fallback-key');
+  });
+
+  it('surfaces a retryable failure and makes one request when no fallback is configured', async () => {
+    let requests = 0;
+    const primary = await start(() => {
+      requests += 1;
+      return { status: 503 };
+    });
+    setPrimary(primary.url);
+    await expect(completeJson('score', 'sys', 'usr')).rejects.toThrow();
+    expect(requests).toBe(1);
   });
 });

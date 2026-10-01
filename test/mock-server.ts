@@ -1,4 +1,4 @@
-import { createServer } from 'node:http';
+import { createServer, type IncomingHttpHeaders } from 'node:http';
 
 export interface MockResult {
   status?: number;
@@ -6,7 +6,11 @@ export interface MockResult {
   delayMs?: number;
 }
 
-export type MockHandler = (body: unknown, callIndex: number) => MockResult;
+export type MockHandler = (
+  body: unknown,
+  callIndex: number,
+  headers: IncomingHttpHeaders,
+) => MockResult;
 
 export interface MockServer {
   url: string;
@@ -29,7 +33,7 @@ export async function createMockServer(handler: MockHandler): Promise<MockServer
       } catch {
         body = {};
       }
-      const result = handler(body, calls++);
+      const result = handler(body, calls++, req.headers);
 
       const respond = (): void => {
         if (result.status !== undefined && result.status >= 400) {
