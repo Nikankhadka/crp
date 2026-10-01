@@ -77,6 +77,19 @@ seed bank in Postgres, so it runs on a read-only serverless filesystem.
   dies mid-run is marked `timed out` after `JOB_STALE_SECONDS` (default 420) the next time it is
   read. Consider a lower `LLM_TIMEOUT_MS` (e.g. 45000) on Vercel.
 
+## Hosted app: job discovery
+
+Both integrations are optional; pasting a description always works without them.
+
+- `ADZUNA_APP_ID` + `ADZUNA_APP_KEY`: `/discover` searches real listings by keyword, place and
+  country (`ADZUNA_COUNTRY` sets the default, `us` otherwise). "Tailor resume" opens `/new` with
+  the posting URL and title prefilled.
+- `FIRECRAWL_API_KEY`: `/new` can read a posting URL into the description box. Only http(s)
+  links are accepted; localhost, IP literals and private suffixes are rejected.
+- Searches and imports run only on an explicit click (each call spends external quota), and
+  upstream failures surface as a fixed message: the Adzuna key travels in the request URL, so no
+  upstream text or URL is ever echoed back.
+
 ## Hosted app: accounts and invites
 
 The app is invite-only; there is no public signup.

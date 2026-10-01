@@ -26,8 +26,14 @@
 - Maintenance pass: removed four unused `z.infer` bank types (`BankSection`, `BankBullet`,
   `BankSummary`, `BankSkillGroup`) and consolidated the duplicated zod-issue formatter into
   `formatIssues` in `src/core/schemas.ts`. This repo has no dead-code tooling (no
-  knip/depcheck/ts-prune/eslint), so detection is manual: grep each export across `src` and
+  knip/depcheck/eslint), so detection is manual: grep each export across `src` and
   `test`, then confirm there is no dynamic `import()`/`require()` before deleting.
+- Discovery slice: Adzuna search (`/discover`) and Firecrawl posting import (`/new`) are optional
+  and configured by env, with `discoveryConfig` treating unset and `replace-me` as off. Every
+  upstream failure becomes a fixed message, never the upstream body or URL, because the Adzuna
+  app id and key travel in the request URL. Both client/server limits live in `src/core/limits.ts`
+  (`MAX_JD_BYTES`) and `src/core/truncate.ts` (`truncateToBytes`, also used for the prompt docs
+  budget), so the browser and server agree on the caps.
 
 ## Gotchas
 
@@ -60,7 +66,10 @@
 - This checkout can have concurrent tooling that commits to `feat/weekend1-core-pipeline` and
   switches the checked-out branch mid-session. Re-check `git branch --show-current` and
   `git status` before staging, and base a new feature branch on the current HEAD so already
-  committed WIP is not re-included in the new commit.
+  committed WIP is not re-included in the new commit. It can also stop mid-refactor: after the
+  user-scoped store migration, `bootstrap.importDocs` briefly called `upsertDoc` without its
+  leading `userId` (and without `await`), which `tsc` caught. When stores change shape, check
+  every caller, especially bootstrap.
 - There is no `CONTEXT.md` or ADR directory. Domain and architecture notes live in
   `.agents/memory.md`, `README.md` and `AGENTS.md`; keep those current instead.
 

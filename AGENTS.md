@@ -10,15 +10,20 @@ using a personal seed bank, without hard-coding any occupation.
 ```
 prompts/base/       universal, job-agnostic prompt files (system.md, one task file per task)
 src/core/           schemas.ts (zod), bank.ts (seed schema), guard.ts, prompt.ts, score.ts, tailor.ts,
-                    import.ts (resume text -> draft bank, validated against the resume text)
+                    import.ts (resume text -> draft bank, validated against the resume text),
+                    limits.ts/truncate.ts (constants and byte clipping shared with the client)
 src/providers/      llm.ts (OpenAI-compatible client with fallback and JSONL traces)
-src/render/         typst.ts (merge, render, one-page shrink loop)
+src/render/         typst.ts (merge, render, one-page shrink loop), docx.ts, layout.ts
+src/app/            Next.js App Router: pages (login, onboarding, jobs, new, discover, docs, bank,
+                    admin) and route handlers under app/api
+src/components/     client and server UI components
 templates/          resume.typ (generic, ATS-safe single-column template)
 src/server/         hosted-app server code: db.ts (PGlite or pg), migrations.ts (embedded, append-only),
                     jobStore/docsStore/seedBank (user-scoped Postgres stores), generate.ts, bootstrap.ts,
                     auth.ts (session cookie), passwords.ts (scrypt), users.ts, invites.ts,
                     importResume.ts (pasted text or PDF -> draft bank),
-                    currentUser.ts (the seam for the signed-in user: withUser/withAdmin, page guards)
+                    currentUser.ts (the seam for the signed-in user: withUser/withAdmin, page guards),
+                    discovery.ts (Adzuna search + Firecrawl posting import, optional)
 src/proxy.ts        edge gate: only checks the signed session cookie and a public-path allowlist
 scripts/            fetch-typst.mjs (pinned linux typst binary into bin/, gitignored),
                     migrate.ts (`npm run db:migrate`)
@@ -80,6 +85,11 @@ carries one.
   `llm.ts`, which must never fail a call.
 - Tests use `freshDb()` from `test/db-helper.ts` (in-memory PGlite, users A and B); no network.
 - All LLM calls go through `src/providers/llm.ts`. Never call a provider directly elsewhere.
+- All job-board calls go through `src/server/discovery.ts`: Adzuna `searchJobs` and Firecrawl
+  `fetchPosting` take injectable `fetch`/`env` for tests, validate their input, and map every
+  upstream failure to a fixed user-safe message. Never echo an upstream body or URL: the Adzuna
+  app id and key travel in the request URL. Both features are optional; `discoveryConfig` treats
+  unset or `replace-me` values as off.
 - Prompts are files under `prompts/base`. Task prompts must stay job-agnostic: no
   occupation-specific vocabulary.
 - Personal data lives in `seed/me/` or the database, never in `prompts/base`.
@@ -89,4 +99,5 @@ carries one.
   unknown fields; the top level is strict, so a misplaced key errors loudly.
 - Org, title, name, credentials and dates are always resolved from the bank at merge time,
   never taken from the model. Only bullet text and the summary rewrite come from the model.
-- Keep code minimal and boring. No build step; run TypeScript directly with tsx.
+- Keep code minimal and boring. The engine runs TypeScript directly with tsx; the web app
+  builds and runs with Next (`npm run dev`, `npm run build`).
