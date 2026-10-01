@@ -1,12 +1,8 @@
-import { currentUserId } from '../../../../../server/currentUser';
+import { withUser } from '../../../../../server/currentUser';
 import { artifactResponse } from '../../../../../server/download';
 
 export const runtime = 'nodejs';
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<Response> {
-  const { id } = await params;
-  return artifactResponse(await currentUserId(), id, 'coverLetter');
-}
+export const GET = withUser<{ params: Promise<{ id: string }> }>(async (userId, _request, { params }) => {
+  return artifactResponse(userId, (await params).id, 'coverLetter');
+});

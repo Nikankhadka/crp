@@ -10,10 +10,26 @@ function base64url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+const MIN_PRODUCTION_SECRET_LENGTH = 32;
+
+/**
+ * In production a short secret (which includes the `replace-me` placeholder from .env.example)
+ * counts as missing, so the app fails closed instead of signing with a guessable key.
+ */
 function sessionSecret(): string | null {
   const secret = process.env.SESSION_SECRET;
-  return secret && secret !== '' ? secret : null;
+  if (!secret) return null;
+  if (process.env.NODE_ENV === 'production' && secret.length < MIN_PRODUCTION_SECRET_LENGTH) return null;
+  return secret;
 }
+
+/**
+ * Login and signup only accept application/json. A cross-site HTML form can send nothing but
+ * form-encoded or text/plain bodies, so refusing those stops it signing a victim into an
+ * attacker's account (login CSRF).
+ */
+export const isJsonRequest = (request: Request): boolean =>
+  (request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json');
 
 async function hmac(secret: string, value: string): Promise<string> {
   const key = await crypto.subtle.importKey(
@@ -34,30 +50,28 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** Create a signed session token: `<expiry>.<HMAC-SHA256(expiry)>`. */
-export async function signSession(ttlSeconds = DEFAULT_TTL_SECONDS): Promise<string> {
+/** Create a signed session token: `<userId>.<expiry>.<HMAC-SHA256(userId.expiry)>`. */
+export async function signSession(userId: string, ttlSeconds = DEFAULT_TTL_SECONDS): Promise<string> {
   const secret = sessionSecret();
   if (!secret) throw new Error('SESSION_SECRET is not set');
-  const expiry = Math.floor(Date.now() / 1000) + ttlSeconds;
-  return `${expiry}.${await hmac(secret, String(expiry))}`;
+  const payload = `${userId}.${Math.floor(Date.now() / 1000) + ttlSeconds}`;
+  return `${payload}.${await hmac(secret, payload)}`;
 }
 
-/** Verify signature and expiry. Returns false (never throws) when unset or malformed. */
-export async function verifySession(token: string | undefined | null): Promise<boolean> {
+/**
+ * Verify signature and expiry and return the user id it was issued to, or null (never throws)
+ * when unset, malformed, tampered or expired. Whether the user still exists is the caller's job.
+ */
+export async function verifySession(token: string | undefined | null): Promise<string | null> {
   const secret = sessionSecret();
-  if (!secret || !token) return false;
-  const [expiry, signature] = token.split('.');
-  if (!expiry || !signature) return false;
+  if (!secret || !token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [userId, expiry, signature] = parts;
+  if (!userId || !signature) return null;
   const expiresAt = Number(expiry);
-  if (!Number.isFinite(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) return false;
-  return constantTimeEqual(signature, await hmac(secret, expiry));
-}
-
-/** Constant-time password check against APP_PASSWORD. */
-export async function checkPassword(input: string): Promise<boolean> {
-  const expected = process.env.APP_PASSWORD;
-  if (!expected) throw new Error('APP_PASSWORD is not set');
-  return constantTimeEqual(await hmac('password', input), await hmac('password', expected));
+  if (!Number.isFinite(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) return null;
+  return constantTimeEqual(signature, await hmac(secret, `${userId}.${expiry}`)) ? userId : null;
 }
 
 /** Set-Cookie value for a freshly signed session. */

@@ -1,7 +1,8 @@
 import { after, NextResponse } from 'next/server';
-import { currentUserId } from '../../../server/currentUser';
+import { withUser } from '../../../server/currentUser';
 import { runGeneration } from '../../../server/generate';
 import { createJob, listJobs } from '../../../server/jobStore';
+import { hasBank } from '../../../server/seedBank';
 
 export const runtime = 'nodejs';
 // Generation runs after the response, inside this function's lifetime.
@@ -12,11 +13,9 @@ export const maxDuration = 300;
 
 const MAX_JD_BYTES = 20 * 1024;
 
-export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({ jobs: await listJobs(await currentUserId()) });
-}
+export const GET = withUser(async (userId) => NextResponse.json({ jobs: await listJobs(userId) }));
 
-export async function POST(request: Request): Promise<NextResponse> {
+export const POST = withUser(async (userId, request) => {
   let body: { jd?: unknown; title?: unknown; pageTarget?: unknown; docIds?: unknown };
   try {
     body = (await request.json()) as typeof body;
@@ -39,8 +38,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     ? body.docIds.filter((id): id is string => typeof id === 'string')
     : [];
 
-  const userId = await currentUserId();
+  if (!(await hasBank(userId))) {
+    return NextResponse.json({ error: 'import your resume first' }, { status: 409 });
+  }
+
   const job = await createJob(userId, { title, jd, pageTarget, docIds });
   after(() => runGeneration(userId, job.id, { jd, docIds, pageTarget }));
   return NextResponse.json({ id: job.id, status: job.status }, { status: 202 });
-}
+});

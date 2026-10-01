@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
+import { ZodError } from 'zod';
 import { parseBank, type Bank } from '../core/bank';
+import { formatIssues } from '../core/schemas';
 import { getDb } from './db';
 
 export interface Seed {
@@ -46,12 +48,61 @@ export function loadSeed(seedDir: string): Seed {
   });
 }
 
-/** Load a user's seed bank from the database. */
-export async function getSeed(userId: string): Promise<Seed> {
+/** The user's stored bank documents, or null when they have not imported or saved one. */
+export async function getBankTexts(userId: string): Promise<SeedFiles | null> {
   const [row] = await (await getDb()).query<{ profile_yaml: string; resume_yaml: string; personal_md: string }>(
     'select profile_yaml, resume_yaml, personal_md from banks where user_id = $1',
     [userId],
   );
-  if (!row) throw new Error('no seed bank for this user');
-  return parseSeed({ profileYaml: row.profile_yaml, resumeYaml: row.resume_yaml, personalMd: row.personal_md });
+  return row ? { profileYaml: row.profile_yaml, resumeYaml: row.resume_yaml, personalMd: row.personal_md } : null;
+}
+
+export async function hasBank(userId: string): Promise<boolean> {
+  return (await (await getDb()).query('select 1 from banks where user_id = $1', [userId])).length > 0;
+}
+
+/** A bank document that does not parse or validate; `field` says which text to fix. */
+export class BankValidationError extends Error {
+  constructor(
+    message: string,
+    readonly field: 'profileYaml' | 'resumeYaml',
+  ) {
+    super(message);
+  }
+}
+
+/** Validate the three bank documents the way a generation run will read them. */
+export function validateBank(files: SeedFiles): Seed {
+  try {
+    const profile: unknown = parse(files.profileYaml);
+    if (profile === null || typeof profile !== 'object' || Array.isArray(profile)) {
+      throw new Error('profile.yaml must be a YAML mapping of key: value lines');
+    }
+  } catch (err) {
+    throw new BankValidationError(err instanceof Error ? err.message : String(err), 'profileYaml');
+  }
+  try {
+    return parseSeed(files);
+  } catch (err) {
+    throw new BankValidationError(err instanceof ZodError ? formatIssues(err) : String(err instanceof Error ? err.message : err), 'resumeYaml');
+  }
+}
+
+/** Validate and store (create or replace) the user's bank. Throws BankValidationError. */
+export async function saveBank(userId: string, files: SeedFiles): Promise<void> {
+  validateBank(files);
+  await (await getDb()).query(
+    `insert into banks (user_id, profile_yaml, resume_yaml, personal_md) values ($1, $2, $3, $4)
+     on conflict (user_id) do update
+       set profile_yaml = excluded.profile_yaml, resume_yaml = excluded.resume_yaml,
+           personal_md = excluded.personal_md, updated_at = now()`,
+    [userId, files.profileYaml, files.resumeYaml, files.personalMd],
+  );
+}
+
+/** Load a user's seed bank from the database. */
+export async function getSeed(userId: string): Promise<Seed> {
+  const files = await getBankTexts(userId);
+  if (!files) throw new Error('no seed bank for this user');
+  return parseSeed(files);
 }

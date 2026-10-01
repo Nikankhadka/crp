@@ -15,6 +15,9 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+// Opening PGlite (WASM) is slow when the whole suite runs in parallel, so these get a generous timeout.
+const OPEN_TIMEOUT_MS = 30_000;
+
 describe('openPglite', () => {
   it('creates missing parent dirs and persists data across reopen', async () => {
     const dataDir = join(dir, 'does', 'not', 'exist', 'pgdata');
@@ -27,7 +30,7 @@ describe('openPglite', () => {
     await migrate(second);
     expect(await second.query('select email from users')).toEqual([{ email: 'persist@test.local' }]);
     await second.close();
-  });
+  }, OPEN_TIMEOUT_MS);
 
   it('rolls a failed transaction back', async () => {
     const db = await openPglite();
@@ -40,5 +43,5 @@ describe('openPglite', () => {
     ).rejects.toThrow('boom');
     expect(await db.query('select 1 from users')).toHaveLength(0);
     await db.close();
-  });
+  }, OPEN_TIMEOUT_MS);
 });

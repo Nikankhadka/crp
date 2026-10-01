@@ -66,7 +66,7 @@ seed bank in Postgres, so it runs on a read-only serverless filesystem.
 - Local dev needs no setup: with `DATABASE_URL` unset it uses embedded Postgres (PGlite), stored
   in `storage/pgdata`. On first start it imports `BOOTSTRAP_SEED_DIR` and `BOOTSTRAP_DOCS_DIR`
   into the owner account (`OWNER_EMAIL`, default `owner@local`) when that account is empty; it
-  never overwrites existing data.
+  never overwrites existing data. These two only ever apply to the owner.
 - Vercel + Supabase: set `DATABASE_URL` to the Supabase transaction pooler connection string
   (port 6543) ending in `?sslmode=no-verify`, plus `APP_PASSWORD`, `SESSION_SECRET`,
   `LLM_API_KEY` and `OWNER_EMAIL`. pg-connection-string 2.14 treats `sslmode=require` as
@@ -76,3 +76,27 @@ seed bank in Postgres, so it runs on a read-only serverless filesystem.
   single-process). Generations run after the response (`after()`, up to 300 seconds); a job that
   dies mid-run is marked `timed out` after `JOB_STALE_SECONDS` (default 420) the next time it is
   read. Consider a lower `LLM_TIMEOUT_MS` (e.g. 45000) on Vercel.
+
+## Hosted app: accounts and invites
+
+The app is invite-only; there is no public signup.
+
+- First login: the owner account is created on first use. Sign in at `/login` with `OWNER_EMAIL`
+  (default `owner@local`) and `APP_PASSWORD`. `APP_PASSWORD` only seeds the owner's password while
+  the owner has none (at least 10 characters; `replace-me` is ignored); editing the variable later
+  does not change an existing password. The owner is the admin. `SESSION_SECRET` signs the session
+  cookie and must be set (`openssl rand -base64 32`); in production a secret shorter than 32
+  characters counts as missing and nobody can sign in.
+- Invite someone: as the owner open `Invites` in the nav (`/admin/invites`), optionally enter their
+  email (the invite then only works for that email) and an expiry (default 7 days), and click
+  `Create invite`. Copy the signup link shown; it is displayed once and only its hash is stored, so
+  create a new invite if it is lost. Revoke an unused invite from the same page. Each link works
+  once.
+- The invited person opens the link, picks a password (at least 10 characters), and lands on
+  onboarding. Their seed bank, docs and jobs are their own; nobody else, including the owner, sees
+  them in the app.
+- Onboarding: paste the resume text or upload a PDF (up to 5 MB; scans without a text layer need
+  pasted text). The model drafts the three bank documents (`profile.yaml`, `resume.yaml`,
+  `personal.md`) and shows any warnings, for example a name it could not find in the resume.
+  Review and edit them, then save. The draft is never saved until you do, and the `Bank` page
+  edits the same documents later. Until a bank is saved, `New` and `Jobs` send you to onboarding.

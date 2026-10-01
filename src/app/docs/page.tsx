@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import AppNav from '../../components/AppNav';
 import NewDocForm from '../../components/NewDocForm';
-import { currentUserId } from '../../server/currentUser';
+import { pageUser } from '../../server/currentUser';
 import { DOC_CATEGORIES, listDocs } from '../../server/docsStore';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DocsPage() {
-  const docs = await listDocs(await currentUserId());
+  const docs = await listDocs((await pageUser()).id);
   const groups = DOC_CATEGORIES.map((category) => ({
     category,
     docs: docs.filter((doc) => doc.category === category),
@@ -29,7 +29,7 @@ export default async function DocsPage() {
         {groups.length === 0 ? (
           <div className="mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
             <p className="text-sm text-slate-500">
-              No docs yet. Create one below or seed them from the server volume.
+              No docs yet. Create one below to give the engine extra context.
             </p>
           </div>
         ) : (

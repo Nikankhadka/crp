@@ -1,13 +1,9 @@
-import { currentUserId } from '../../../../../server/currentUser';
+import { withUser } from '../../../../../server/currentUser';
 import { artifactResponse } from '../../../../../server/download';
 
 export const runtime = 'nodejs';
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<Response> {
-  const { id } = await params;
+export const GET = withUser<{ params: Promise<{ id: string }> }>(async (userId, request, { params }) => {
   const download = new URL(request.url).searchParams.get('download') === '1';
-  return artifactResponse(await currentUserId(), id, 'pdf', download);
-}
+  return artifactResponse(userId, (await params).id, 'pdf', download);
+});

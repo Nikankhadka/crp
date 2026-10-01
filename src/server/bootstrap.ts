@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ensureOwnerUser } from './currentUser';
 import { getDb, type Db } from './db';
 import { listDocs, upsertDoc, type DocCategory } from './docsStore';
 import { migrate } from './migrations';
+import { ensureOwnerUser } from './users';
 
 const SEED_FILES = ['profile.yaml', 'resume.yaml', 'personal.md'];
 

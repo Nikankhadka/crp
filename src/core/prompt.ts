@@ -12,16 +12,17 @@ export interface PromptLayers {
   research?: string;
 }
 
+/** The system prompt for a task: the universal rules followed by the task's own file. */
+export function loadSystem(task: string): string {
+  const { promptsDir } = resolvePaths();
+  return readFileSync(join(promptsDir, 'system.md'), 'utf8') + readFileSync(join(promptsDir, `${task}.md`), 'utf8');
+}
+
 /**
  * Pure string assembly. System prompt is the two base files concatenated; the user message
  * is the personal/bank/docs/research/job layers, with docs and research omitted when absent.
  */
 export function buildPrompt(layers: PromptLayers): { system: string; user: string } {
-  const { promptsDir } = resolvePaths();
-  const system =
-    readFileSync(join(promptsDir, 'system.md'), 'utf8') +
-    readFileSync(join(promptsDir, `${layers.task}.md`), 'utf8');
-
   const parts = [
     `<personal>\n${layers.personal}\n</personal>`,
     `<bank>\n${layers.bank}\n</bank>`,
@@ -34,5 +35,5 @@ export function buildPrompt(layers: PromptLayers): { system: string; user: strin
   }
   parts.push(`<job>\n${layers.job}\n</job>`);
 
-  return { system, user: parts.join('\n') };
+  return { system: loadSystem(layers.task), user: parts.join('\n') };
 }

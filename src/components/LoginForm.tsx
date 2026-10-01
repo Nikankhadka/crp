@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 
 export default function LoginForm() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -17,7 +18,7 @@ export default function LoginForm() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { error?: string };
@@ -36,12 +37,25 @@ export default function LoginForm() {
   return (
     <form onSubmit={submit} className="mt-6 space-y-4">
       <label className="block">
+        <span className="text-sm font-medium text-slate-700">Email</span>
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
+          autoFocus
+          required
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        />
+      </label>
+
+      <label className="block">
         <span className="text-sm font-medium text-slate-700">Password</span>
         <input
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          autoFocus
+          autoComplete="current-password"
           required
           className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         />

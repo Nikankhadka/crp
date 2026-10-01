@@ -1,12 +1,12 @@
 import AppNav from '../../components/AppNav';
 import NewJobForm from '../../components/NewJobForm';
-import { currentUserId } from '../../server/currentUser';
+import { bankPageUser } from '../../server/currentUser';
 import { listDocs } from '../../server/docsStore';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NewJobPage() {
-  const docs = await listDocs(await currentUserId());
+  const docs = await listDocs((await bankPageUser()).id);
 
   return (
     <>

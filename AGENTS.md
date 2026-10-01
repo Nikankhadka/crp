@@ -9,13 +9,17 @@ using a personal seed bank, without hard-coding any occupation.
 
 ```
 prompts/base/       universal, job-agnostic prompt files (system.md, one task file per task)
-src/core/           schemas.ts (zod), bank.ts (seed schema), guard.ts, prompt.ts, score.ts, tailor.ts
+src/core/           schemas.ts (zod), bank.ts (seed schema), guard.ts, prompt.ts, score.ts, tailor.ts,
+                    import.ts (resume text -> draft bank, validated against the resume text)
 src/providers/      llm.ts (OpenAI-compatible client with fallback and JSONL traces)
 src/render/         typst.ts (merge, render, one-page shrink loop)
 templates/          resume.typ (generic, ATS-safe single-column template)
 src/server/         hosted-app server code: db.ts (PGlite or pg), migrations.ts (embedded, append-only),
                     jobStore/docsStore/seedBank (user-scoped Postgres stores), generate.ts, bootstrap.ts,
-                    currentUser.ts (the seam for the signed-in user)
+                    auth.ts (session cookie), passwords.ts (scrypt), users.ts, invites.ts,
+                    importResume.ts (pasted text or PDF -> draft bank),
+                    currentUser.ts (the seam for the signed-in user: withUser/withAdmin, page guards)
+src/proxy.ts        edge gate: only checks the signed session cookie and a public-path allowlist
 scripts/            fetch-typst.mjs (pinned linux typst binary into bin/, gitignored),
                     migrate.ts (`npm run db:migrate`)
 src/cli.ts          the `[score|tailor] <jd.txt>` entry point
@@ -51,6 +55,26 @@ carries one.
   test). Every store function takes `userId` first and filters by it; another user's data must be
   indistinguishable from missing. Schema changes are new entries in `src/server/migrations.ts`
   (append-only, never edit an applied one).
+- Auth is invite-only. There is no public signup. Accounts are `users` rows with `password_hash`
+  (scrypt), `role` (`admin` or `user`) and `disabled`. The owner (`OWNER_EMAIL`) is the admin and is
+  created on first use; `APP_PASSWORD` seeds the owner's password only while it has none. Only an
+  admin can create invites (`/admin/invites`); an invite is a single-use, expiring token whose
+  sha256 is the only thing stored, and the raw token is shown once in the signup link
+  `/signup?token=...`. Sessions are a stateless HMAC-signed `cp_session` cookie (id + expiry,
+  `SESSION_SECRET`, at least 32 characters in production or it counts as missing); `currentUser()`
+  also loads the user (once per request, via React `cache()`), so a disabled or deleted user is
+  logged out at once. Login and signup only accept `application/json` (415 otherwise), which
+  stops cross-site form login CSRF. `src/proxy.ts` must stay free of node-only imports (no scrypt, no db): it checks the
+  signature only, the route handlers do the real check. New routes are protected by default; add to
+  the public allowlist in `src/proxy.ts` only for sign-in paths.
+- Banks are per user. A new user has no bank and no docs: `/onboarding` imports their resume with
+  `prompts/base/import.md` (`src/core/import.ts`, pasted text or a PDF read by `unpdf`). The import
+  returns an unsaved draft (profile.yaml, resume.yaml, personal.md texts plus warnings) that the
+  user reviews and edits before `PUT /api/bank` validates and saves it; `/bank` edits it later.
+  The import must not fabricate: numbers, ids and shape are validated against the resume text,
+  and names the text lacks come back as warnings. Pages `/new` and `/jobs` redirect to
+  `/onboarding` and `POST /api/jobs` answers 409 while the user has no bank.
+  `BOOTSTRAP_SEED_DIR` and `BOOTSTRAP_DOCS_DIR` apply to the owner only.
 - No filesystem writes in server code except under `os.tmpdir()` (the deploy filesystem is
   read-only). The only exceptions are local-dev PGlite data and best-effort LLM traces in
   `llm.ts`, which must never fail a call.

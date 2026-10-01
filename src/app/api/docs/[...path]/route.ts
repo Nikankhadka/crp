@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
-import { currentUserId } from '../../../../server/currentUser';
+import { withUser } from '../../../../server/currentUser';
 import { deleteDoc, DocTooLargeError, readDoc, saveDoc } from '../../../../server/docsStore';
 
 export const runtime = 'nodejs';
 
 type Context = { params: Promise<{ path: string[] }> };
 
-export async function GET(_request: Request, { params }: Context): Promise<NextResponse> {
+export const GET = withUser<Context>(async (userId, _request, { params }) => {
   const { path } = await params;
-  const doc = await readDoc(await currentUserId(), path.join('/'));
+  const doc = await readDoc(userId, path.join('/'));
   if (!doc) return NextResponse.json({ error: 'doc not found' }, { status: 404 });
   return NextResponse.json({ doc });
-}
+});
 
-export async function PUT(request: Request, { params }: Context): Promise<NextResponse> {
+export const PUT = withUser<Context>(async (userId, request, { params }) => {
   const { path } = await params;
   let body: { content?: unknown };
   try {
@@ -25,7 +25,7 @@ export async function PUT(request: Request, { params }: Context): Promise<NextRe
     return NextResponse.json({ error: 'content is required' }, { status: 400 });
   }
   try {
-    const meta = await saveDoc(await currentUserId(), path.join('/'), body.content);
+    const meta = await saveDoc(userId, path.join('/'), body.content);
     if (!meta) return NextResponse.json({ error: 'doc not found' }, { status: 404 });
     return NextResponse.json({ doc: meta });
   } catch (err) {
@@ -37,12 +37,12 @@ export async function PUT(request: Request, { params }: Context): Promise<NextRe
       { status: 400 },
     );
   }
-}
+});
 
-export async function DELETE(_request: Request, { params }: Context): Promise<NextResponse> {
+export const DELETE = withUser<Context>(async (userId, _request, { params }) => {
   const { path } = await params;
-  if (!(await deleteDoc(await currentUserId(), path.join('/')))) {
+  if (!(await deleteDoc(userId, path.join('/')))) {
     return NextResponse.json({ error: 'doc not found' }, { status: 404 });
   }
   return NextResponse.json({ ok: true });
-}
+});

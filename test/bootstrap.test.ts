@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ensureBoot } from '../src/server/bootstrap';
-import { currentUserId, ensureOwnerUser } from '../src/server/currentUser';
 import { resetDb } from '../src/server/db';
 import { listDocs, readDoc, saveDoc } from '../src/server/docsStore';
+import { ensureOwnerUser } from '../src/server/users';
 import { freshDb, SEED_FILES, type TestDb } from './db-helper';
 
 let t: TestDb;
@@ -38,8 +38,7 @@ describe('ensureBoot', () => {
   it('creates the owner, imports the seed bank and mapped docs', async () => {
     await ensureBoot();
     const owner = await ensureOwnerUser(t.db);
-    expect(await currentUserId()).toBe(owner);
-    const [bank] = await t.db.query<{ profile_yaml: string; resume_yaml: string; personal_md: string }>(
+        const [bank] = await t.db.query<{ profile_yaml: string; resume_yaml: string; personal_md: string }>(
       'select profile_yaml, resume_yaml, personal_md from banks where user_id = $1',
       [owner],
     );
@@ -53,7 +52,7 @@ describe('ensureBoot', () => {
 
   it('is idempotent and never overwrites edited data', async () => {
     await ensureBoot();
-    const owner = await currentUserId();
+    const owner = await ensureOwnerUser(t.db);
     await saveDoc(owner, 'memory/project-memory-notes', '# Project memory notes\n\nEdited.');
     await t.db.query(`update banks set personal_md = 'edited' where user_id = $1`, [owner]);
 
@@ -78,7 +77,7 @@ describe('ensureBoot', () => {
     delete process.env.BOOTSTRAP_DOCS_DIR;
     rmSync(join(dir, 'seed', 'personal.md'));
     await ensureBoot();
-    const owner = await currentUserId();
+    const owner = await ensureOwnerUser(t.db);
     expect(await listDocs(owner)).toEqual([]);
     expect(await t.db.query('select 1 from banks where user_id = $1', [owner])).toHaveLength(0);
   });

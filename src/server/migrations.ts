@@ -60,6 +60,28 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       );
     `,
   },
+  {
+    id: '002_auth_invites',
+    sql: `
+      alter table users add column password_hash text;
+      alter table users add column role text not null default 'user' check (role in ('admin', 'user'));
+      alter table users add column disabled boolean not null default false;
+      -- Emails are compared case-insensitively; signup stores them lowercased.
+      create unique index users_email_lower_idx on users (lower(email));
+
+      create table invites (
+        id uuid primary key default gen_random_uuid(),
+        token_hash text unique not null,
+        email text,
+        created_by uuid not null references users (id) on delete cascade,
+        created_at timestamptz not null default now(),
+        expires_at timestamptz not null,
+        used_at timestamptz,
+        used_by uuid references users (id) on delete set null
+      );
+      create index invites_created_by_idx on invites (created_by, created_at desc);
+    `,
+  },
 ];
 
 const LOCK_KEY = 7301001;

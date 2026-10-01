@@ -46,7 +46,7 @@ function tokenize(text: string): Set<string> {
 // are not separate numbers.
 const NUMBER_RE = /\d+(?:\.\d+)?/g;
 
-function numbers(text: string): Set<string> {
+export function numbers(text: string): Set<string> {
   return new Set(text.match(NUMBER_RE) ?? []);
 }
 
