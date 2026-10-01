@@ -77,9 +77,9 @@ async function importDocs(userId: string): Promise<void> {
   if (!source || source === '') return;
   if ((await listDocs(userId)).length > 0) return;
   for (const doc of DOC_BOOTSTRAP_MAP) {
-    const from = join(/*turbopackIgnore: true*/ source, doc.file);
-    if (!existsSync(from)) continue;
-    await upsertDoc(userId, doc.category, doc.slug, readFileSync(from, 'utf8'));
+    const from = join(/* turbopackIgnore: true */ source, doc.file);
+    if (!existsSync(/* turbopackIgnore: true */ from)) continue;
+    await upsertDoc(userId, doc.category, doc.slug, readFileSync(/* turbopackIgnore: true */ from, 'utf8'));
   }
 }
 
