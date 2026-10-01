@@ -18,6 +18,11 @@
   deps so the shrink loop is unit-testable without Typst. The initial render is not a pass.
 - Render output goes to `out/local/<jd-slug>/v1/` (gitignored). `data/` and `output/` are
   never touched.
+- LLM provider defaults to the free OpenCode Zen gateway: base URL
+  `https://opencode.ai/zen/v1`, primary model `nemotron-3.5-lightning-free`, fallback model
+  `nemotron-3-ultra-free`. A single key is enough via `LLM_API_KEY` or its `OPENCODE_API_KEY`
+  alias. The fallback is active only when `LLM_FALLBACK_MODEL` or `LLM_FALLBACK_BASE_URL` is
+  set; its base URL and key default to the effective primary. Explicit env always overrides.
 
 ## Gotchas
 
@@ -40,6 +45,17 @@
 - The reference document `03_job_application_MoE_system_prompt.md` contains a corrupted line
   ("Possibly inflate ownership, seniority or tenure") that the project memory says to ignore.
   Never propagate it.
+- Retired or unsupported Zen free models: `deepseek-v4-flash-free` (promotion ended, live calls
+  return "Model is unavailable") and `muse-spark-1.3-contributor-free` (Responses-API only, and
+  its free tier trains on prompts/completions). The free pool rotates, so keep the fallback path
+  and switch models by env, not code.
+- `test/mock-server.ts` `MockHandler` receives request `headers` as its third argument
+  (`IncomingHttpHeaders`); existing handlers taking 0-2 args stay assignable. Use it to assert
+  the `Authorization: Bearer` key selection.
+- This checkout can have concurrent tooling that commits to `feat/weekend1-core-pipeline` and
+  switches the checked-out branch mid-session. Re-check `git branch --show-current` and
+  `git status` before staging, and base a new feature branch on the current HEAD so already
+  committed WIP is not re-included in the new commit.
 
 ## Conventions
 
