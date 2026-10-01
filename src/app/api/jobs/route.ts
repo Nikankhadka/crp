@@ -1,14 +1,19 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { currentUserId } from '../../../server/currentUser';
 import { runGeneration } from '../../../server/generate';
 import { createJob, listJobs } from '../../../server/jobStore';
-import { enqueue } from '../../../server/queue';
 
 export const runtime = 'nodejs';
+// Generation runs after the response, inside this function's lifetime.
+// ponytail: score + tailor can far exceed 300s in the worst case (90s per-call timeout plus the
+// fallback retry, twice over, plus rendering). A job that overruns is marked 'timed out' by the
+// stale sweep. Upgrade path: a durable queue or Workflow, or a plan with a longer maxDuration.
+export const maxDuration = 300;
 
 const MAX_JD_BYTES = 20 * 1024;
 
 export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({ jobs: listJobs() });
+  return NextResponse.json({ jobs: await listJobs(await currentUserId()) });
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -34,7 +39,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     ? body.docIds.filter((id): id is string => typeof id === 'string')
     : [];
 
-  const job = createJob({ title, jd, pageTarget, docIds });
-  enqueue({ jobId: job.id, run: () => runGeneration(job.id, { jd, docIds, pageTarget }) });
+  const userId = await currentUserId();
+  const job = await createJob(userId, { title, jd, pageTarget, docIds });
+  after(() => runGeneration(userId, job.id, { jd, docIds, pageTarget }));
   return NextResponse.json({ id: job.id, status: job.status }, { status: 202 });
 }

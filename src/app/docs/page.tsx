@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import AppNav from '../../components/AppNav';
 import NewDocForm from '../../components/NewDocForm';
+import { currentUserId } from '../../server/currentUser';
 import { DOC_CATEGORIES, listDocs } from '../../server/docsStore';
 
 export const dynamic = 'force-dynamic';
 
-export default function DocsPage() {
-  const docs = listDocs();
+export default async function DocsPage() {
+  const docs = await listDocs(await currentUserId());
   const groups = DOC_CATEGORIES.map((category) => ({
     category,
     docs: docs.filter((doc) => doc.category === category),

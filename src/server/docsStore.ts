@@ -1,6 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { resolvePaths } from '../paths';
+import { getDb } from './db';
 
 export const DOC_CATEGORIES = [
   'system-prompts',
@@ -29,10 +27,6 @@ export function maxDocBytes(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : 512 * 1024;
 }
 
-function docsRoot(): string {
-  return resolvePaths().docsDir;
-}
-
 export function isDocCategory(value: string): value is DocCategory {
   return (DOC_CATEGORIES as readonly string[]).includes(value);
 }
@@ -41,7 +35,7 @@ function isSafeSlug(slug: string): boolean {
   return /^[a-z0-9][a-z0-9-]*$/.test(slug);
 }
 
-/** Split `category/slug` and reject anything that could escape the docs directory. */
+/** Split `category/slug`; null unless it is a known category and a safe slug. */
 export function parseDocId(id: string): { category: DocCategory; slug: string } | null {
   const parts = id.split('/');
   if (parts.length !== 2) return null;
@@ -73,72 +67,85 @@ function metaFor(category: DocCategory, slug: string, content: string, updatedAt
   };
 }
 
-function docPath(category: DocCategory, slug: string): string {
-  return join(/*turbopackIgnore: true*/ docsRoot(), category, `${slug}.md`);
-}
-
-/** Create or overwrite a doc. Throws DocTooLargeError past MAX_DOC_BYTES. */
-export function upsertDoc(category: DocCategory, slug: string, content: string): DocMeta {
+function assertWritable(slug: string, content: string): void {
   if (!isSafeSlug(slug)) throw new Error(`invalid doc slug: ${slug}`);
   if (Buffer.byteLength(content, 'utf8') > maxDocBytes()) {
     throw new DocTooLargeError(`doc exceeds ${maxDocBytes()} bytes`);
   }
-  const path = docPath(category, slug);
-  mkdirSync(join(docsRoot(), category), { recursive: true });
-  writeFileSync(path, content);
-  return metaFor(category, slug, content, new Date());
 }
 
-export function listDocs(): DocMeta[] {
-  const root = docsRoot();
-  if (!existsSync(root)) return [];
-  const docs: DocMeta[] = [];
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !isDocCategory(entry.name)) continue;
-    const category = entry.name;
-    for (const file of readdirSync(join(root, category))) {
-      if (!file.endsWith('.md')) continue;
-      const slug = file.slice(0, -3);
-      if (!isSafeSlug(slug)) continue;
-      const path = join(root, category, file);
-      const content = readFileSync(path, 'utf8');
-      docs.push(metaFor(category, slug, content, statSync(path).mtime));
-    }
-  }
-  return docs.sort(
-    (a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title),
+/** Create or overwrite a doc. Throws DocTooLargeError past MAX_DOC_BYTES. */
+export async function upsertDoc(
+  userId: string,
+  category: DocCategory,
+  slug: string,
+  content: string,
+): Promise<DocMeta> {
+  assertWritable(slug, content);
+  const [row] = await (await getDb()).query<{ updated_at: Date }>(
+    `insert into docs (user_id, category, slug, content) values ($1, $2, $3, $4)
+     on conflict (user_id, category, slug) do update set content = excluded.content, updated_at = now()
+     returning updated_at`,
+    [userId, category, slug, content],
   );
+  return metaFor(category, slug, content, row.updated_at);
 }
 
-export function readDoc(id: string): { meta: DocMeta; content: string } | null {
+// ponytail: listing loads every doc's full content to derive its title from the first heading.
+// Fine at personal-doc scale; store a title column when lists or docs grow large.
+export async function listDocs(userId: string): Promise<DocMeta[]> {
+  const rows = await (await getDb()).query<{ category: DocCategory; slug: string; content: string; updated_at: Date }>(
+    'select category, slug, content, updated_at from docs where user_id = $1',
+    [userId],
+  );
+  return rows
+    .filter((row) => isDocCategory(row.category) && isSafeSlug(row.slug))
+    .map((row) => metaFor(row.category, row.slug, row.content, row.updated_at))
+    .sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
+}
+
+export async function readDoc(userId: string, id: string): Promise<{ meta: DocMeta; content: string } | null> {
   const parsed = parseDocId(id);
   if (!parsed) return null;
-  const path = docPath(parsed.category, parsed.slug);
-  if (!existsSync(path)) return null;
-  const content = readFileSync(path, 'utf8');
-  return { meta: metaFor(parsed.category, parsed.slug, content, statSync(path).mtime), content };
+  const [row] = await (await getDb()).query<{ content: string; updated_at: Date }>(
+    'select content, updated_at from docs where user_id = $1 and category = $2 and slug = $3',
+    [userId, parsed.category, parsed.slug],
+  );
+  return row ? { meta: metaFor(parsed.category, parsed.slug, row.content, row.updated_at), content: row.content } : null;
 }
 
 /** Save an existing or new doc by id. */
-export function saveDoc(id: string, content: string): DocMeta | null {
+export async function saveDoc(userId: string, id: string, content: string): Promise<DocMeta | null> {
   const parsed = parseDocId(id);
   if (!parsed) return null;
-  return upsertDoc(parsed.category, parsed.slug, content);
+  return upsertDoc(userId, parsed.category, parsed.slug, content);
 }
 
 /** Create a doc from a title; throws when the derived slug already exists. */
-export function createDoc(category: DocCategory, title: string, content: string): DocMeta {
+export async function createDoc(
+  userId: string,
+  category: DocCategory,
+  title: string,
+  content: string,
+): Promise<DocMeta> {
   const slug = slugForTitle(title);
   if (slug === '') throw new Error('title must contain letters or digits');
-  if (existsSync(docPath(category, slug))) throw new Error('a doc with that title already exists');
-  return upsertDoc(category, slug, content);
+  assertWritable(slug, content);
+  const [row] = await (await getDb()).query<{ updated_at: Date }>(
+    `insert into docs (user_id, category, slug, content) values ($1, $2, $3, $4)
+     on conflict (user_id, category, slug) do nothing returning updated_at`,
+    [userId, category, slug, content],
+  );
+  if (!row) throw new Error('a doc with that title already exists');
+  return metaFor(category, slug, content, row.updated_at);
 }
 
-export function deleteDoc(id: string): boolean {
+export async function deleteDoc(userId: string, id: string): Promise<boolean> {
   const parsed = parseDocId(id);
   if (!parsed) return false;
-  const path = docPath(parsed.category, parsed.slug);
-  if (!existsSync(path)) return false;
-  rmSync(path);
-  return true;
+  const rows = await (await getDb()).query(
+    'delete from docs where user_id = $1 and category = $2 and slug = $3 returning slug',
+    [userId, parsed.category, parsed.slug],
+  );
+  return rows.length > 0;
 }

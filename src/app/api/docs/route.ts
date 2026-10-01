@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { currentUserId } from '../../../server/currentUser';
 import {
   createDoc,
   DocTooLargeError,
@@ -9,7 +10,7 @@ import {
 export const runtime = 'nodejs';
 
 export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({ docs: listDocs() });
+  return NextResponse.json({ docs: await listDocs(await currentUserId()) });
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -32,7 +33,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    return NextResponse.json({ doc: createDoc(category, title, content) }, { status: 201 });
+    const doc = await createDoc(await currentUserId(), category, title, content);
+    return NextResponse.json({ doc }, { status: 201 });
   } catch (err) {
     if (err instanceof DocTooLargeError) {
       return NextResponse.json({ error: err.message }, { status: 413 });

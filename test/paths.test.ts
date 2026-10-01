@@ -4,7 +4,7 @@ import { resolvePaths } from '../src/paths';
 const ORIGINAL = { ...process.env };
 
 afterEach(() => {
-  for (const key of ['APP_ROOT', 'STORAGE_DIR', 'SEED_DIR', 'DOCS_DIR']) {
+  for (const key of ['APP_ROOT', 'STORAGE_DIR', 'SEED_DIR']) {
     if (ORIGINAL[key] === undefined) delete process.env[key];
     else process.env[key] = ORIGINAL[key];
   }
@@ -15,12 +15,9 @@ describe('resolvePaths', () => {
     delete process.env.APP_ROOT;
     delete process.env.STORAGE_DIR;
     delete process.env.SEED_DIR;
-    delete process.env.DOCS_DIR;
     const paths = resolvePaths();
     expect(paths.appRoot).toBe(process.cwd());
     expect(paths.storageDir).toBe(`${process.cwd()}/storage`);
-    expect(paths.jobsDir).toBe(`${process.cwd()}/storage/jobs`);
-    expect(paths.docsDir).toBe(`${process.cwd()}/storage/docs`);
     expect(paths.tracesDir).toBe(`${process.cwd()}/storage/traces`);
     expect(paths.seedDir).toBe(`${process.cwd()}/seed/me`);
     expect(paths.promptsDir).toBe(`${process.cwd()}/prompts/base`);
@@ -30,12 +27,10 @@ describe('resolvePaths', () => {
     process.env.APP_ROOT = '/srv/app';
     delete process.env.STORAGE_DIR;
     process.env.SEED_DIR = '/data/seed';
-    process.env.DOCS_DIR = '/data/docs';
     const paths = resolvePaths();
     expect(paths.appRoot).toBe('/srv/app');
     expect(paths.storageDir).toBe('/srv/app/storage');
     expect(paths.seedDir).toBe('/data/seed');
-    expect(paths.docsDir).toBe('/data/docs');
   });
 
   it('treats empty env values as unset', () => {

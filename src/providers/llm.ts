@@ -69,10 +69,15 @@ interface TraceRecord {
   error?: string;
 }
 
+// Best-effort: a read-only filesystem (serverless) must never fail an LLM call.
 function writeTrace(record: TraceRecord): void {
-  const tracePath = join(resolvePaths().tracesDir, 'llm-calls.jsonl');
-  mkdirSync(dirname(tracePath), { recursive: true });
-  appendFileSync(tracePath, `${JSON.stringify(record)}\n`);
+  try {
+    const tracePath = join(resolvePaths().tracesDir, 'llm-calls.jsonl');
+    mkdirSync(dirname(tracePath), { recursive: true });
+    appendFileSync(tracePath, `${JSON.stringify(record)}\n`);
+  } catch {
+    // tracing is optional
+  }
 }
 
 function isRetryable(err: unknown): boolean {

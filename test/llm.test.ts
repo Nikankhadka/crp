@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { completeJson } from '../src/providers/llm';
 import { clearLlmEnv, closeServers, setPrimaryEnv, startServer } from './helpers';
@@ -10,6 +13,7 @@ function setFallback(url: string): void {
 }
 
 afterEach(async () => {
+  delete process.env.STORAGE_DIR;
   clearLlmEnv();
   await closeServers();
 });
@@ -124,5 +128,25 @@ describe('completeJson', () => {
     setPrimaryEnv(primary.url);
     await expect(completeJson('score', 'sys', 'usr')).rejects.toThrow();
     expect(requests).toBe(1);
+  });
+
+  it('swallows trace-write failures (read-only or unwritable storage)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cpilot-trace-'));
+    try {
+      // STORAGE_DIR under a regular file makes mkdir/append fail like a read-only filesystem.
+      writeFileSync(join(dir, 'not-a-dir'), '');
+      process.env.STORAGE_DIR = join(dir, 'not-a-dir', 'storage');
+      const primary = await startServer(() => ({ content: JSON.stringify(VALID_SCORE) }));
+      setPrimaryEnv(primary.url);
+      await expect(completeJson('score', 'sys', 'usr')).resolves.toEqual(VALID_SCORE);
+
+      const failing = await startServer(() => ({ status: 503 }));
+      setPrimaryEnv(failing.url);
+      const err = await completeJson('score', 'sys', 'usr').catch((e: unknown) => e as Error);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).not.toMatch(/ENOTDIR|EEXIST|ENOENT/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -1,22 +1,19 @@
-import { readFileSync } from 'node:fs';
-import { basename } from 'node:path';
-import { artifactPath, type ArtifactName } from './jobStore';
+import { getArtifact, type ArtifactName } from './jobStore';
 
-/** Stream a job artifact with the right content type; 404 JSON when it is missing. */
-export function artifactResponse(
+/** Serve a stored job artifact with its stored content type; 404 JSON when it is missing. */
+export async function artifactResponse(
+  userId: string,
   id: string,
   name: ArtifactName,
-  contentType: string,
   download = false,
-): Response {
-  const path = artifactPath(id, name);
-  if (!path) return Response.json({ error: 'artifact not found' }, { status: 404 });
-  const data = readFileSync(path);
-  return new Response(data, {
+): Promise<Response> {
+  const artifact = await getArtifact(userId, id, name);
+  if (!artifact) return Response.json({ error: 'artifact not found' }, { status: 404 });
+  return new Response(new Uint8Array(artifact.data), {
     headers: {
-      'content-type': contentType,
-      'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${basename(path)}"`,
-      'content-length': String(data.byteLength),
+      'content-type': artifact.contentType,
+      'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${artifact.filename}"`,
+      'content-length': String(artifact.data.byteLength),
     },
   });
 }

@@ -57,3 +57,22 @@ Every tailored bullet cites a bank `sourceId`, and the guard rejects unknown ids
 numbers, rewrites that drift from their source, unknown skills, and unsupported vocabulary
 before the result is returned. The seed bank is generic: `sections` is a free-form list of
 `{ type, items }`, so any section a person needs works without schema changes.
+
+## Hosted app: database and deploy
+
+The web app keeps jobs, generated files (PDF, DOCX, JSON, cover letter), reference docs and the
+seed bank in Postgres, so it runs on a read-only serverless filesystem.
+
+- Local dev needs no setup: with `DATABASE_URL` unset it uses embedded Postgres (PGlite), stored
+  in `storage/pgdata`. On first start it imports `BOOTSTRAP_SEED_DIR` and `BOOTSTRAP_DOCS_DIR`
+  into the owner account (`OWNER_EMAIL`, default `owner@local`) when that account is empty; it
+  never overwrites existing data.
+- Vercel + Supabase: set `DATABASE_URL` to the Supabase transaction pooler connection string
+  (port 6543) ending in `?sslmode=no-verify`, plus `APP_PASSWORD`, `SESSION_SECRET`,
+  `LLM_API_KEY` and `OWNER_EMAIL`. pg-connection-string 2.14 treats `sslmode=require` as
+  `verify-full`, which fails against Supabase's certificate chain, and a URL without any
+  `sslmode` connects in plaintext. The schema is applied on server start, or manually with
+  `npm run db:migrate` (do not run it while `next dev` holds `storage/pgdata`; PGlite is
+  single-process). Generations run after the response (`after()`, up to 300 seconds); a job that
+  dies mid-run is marked `timed out` after `JOB_STALE_SECONDS` (default 420) the next time it is
+  read. Consider a lower `LLM_TIMEOUT_MS` (e.g. 45000) on Vercel.

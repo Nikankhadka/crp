@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { currentUserId } from '../../../../server/currentUser';
 import { deleteDoc, DocTooLargeError, readDoc, saveDoc } from '../../../../server/docsStore';
 
 export const runtime = 'nodejs';
@@ -7,7 +8,7 @@ type Context = { params: Promise<{ path: string[] }> };
 
 export async function GET(_request: Request, { params }: Context): Promise<NextResponse> {
   const { path } = await params;
-  const doc = readDoc(path.join('/'));
+  const doc = await readDoc(await currentUserId(), path.join('/'));
   if (!doc) return NextResponse.json({ error: 'doc not found' }, { status: 404 });
   return NextResponse.json({ doc });
 }
@@ -24,7 +25,7 @@ export async function PUT(request: Request, { params }: Context): Promise<NextRe
     return NextResponse.json({ error: 'content is required' }, { status: 400 });
   }
   try {
-    const meta = saveDoc(path.join('/'), body.content);
+    const meta = await saveDoc(await currentUserId(), path.join('/'), body.content);
     if (!meta) return NextResponse.json({ error: 'doc not found' }, { status: 404 });
     return NextResponse.json({ doc: meta });
   } catch (err) {
@@ -40,7 +41,7 @@ export async function PUT(request: Request, { params }: Context): Promise<NextRe
 
 export async function DELETE(_request: Request, { params }: Context): Promise<NextResponse> {
   const { path } = await params;
-  if (!deleteDoc(path.join('/'))) {
+  if (!(await deleteDoc(await currentUserId(), path.join('/')))) {
     return NextResponse.json({ error: 'doc not found' }, { status: 404 });
   }
   return NextResponse.json({ ok: true });

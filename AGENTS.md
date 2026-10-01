@@ -13,11 +13,15 @@ src/core/           schemas.ts (zod), bank.ts (seed schema), guard.ts, prompt.ts
 src/providers/      llm.ts (OpenAI-compatible client with fallback and JSONL traces)
 src/render/         typst.ts (merge, render, one-page shrink loop)
 templates/          resume.typ (generic, ATS-safe single-column template)
-scripts/            fetch-typst.mjs (pinned linux typst binary into bin/, gitignored)
+src/server/         hosted-app server code: db.ts (PGlite or pg), migrations.ts (embedded, append-only),
+                    jobStore/docsStore/seedBank (user-scoped Postgres stores), generate.ts, bootstrap.ts,
+                    currentUser.ts (the seam for the signed-in user)
+scripts/            fetch-typst.mjs (pinned linux typst binary into bin/, gitignored),
+                    migrate.ts (`npm run db:migrate`)
 src/cli.ts          the `[score|tailor] <jd.txt>` entry point
 seed/me/            personal seed bank: profile.yaml, resume.yaml, personal.md (gitignored)
 test/               vitest tests and fixtures (no network)
-traces/             llm-calls.jsonl traces (gitignored)
+storage/            local dev PGlite data (pgdata/) and LLM traces (traces/llm-calls.jsonl), gitignored
 out/                rendered score/resume artifacts (gitignored)
 ```
 
@@ -27,6 +31,7 @@ out/                rendered score/resume artifacts (gitignored)
 npm install
 npm run check
 npm test
+npm run db:migrate                      # apply schema migrations (the server also migrates on start)
 npx tsx src/cli.ts <jd-file>            # score + tailor + render one-page PDF
 npx tsx src/cli.ts score <jd-file>      # debug: score only
 npx tsx src/cli.ts tailor <jd-file>     # debug: score + tailor JSON
@@ -41,6 +46,15 @@ carries one.
 
 ## Conventions
 
+- The hosted app stores jobs, artifacts, docs and seed banks in Postgres: `DATABASE_URL` selects
+  `pg` (Supabase), unset selects embedded PGlite (`<STORAGE_DIR>/pgdata` in dev, in memory under
+  test). Every store function takes `userId` first and filters by it; another user's data must be
+  indistinguishable from missing. Schema changes are new entries in `src/server/migrations.ts`
+  (append-only, never edit an applied one).
+- No filesystem writes in server code except under `os.tmpdir()` (the deploy filesystem is
+  read-only). The only exceptions are local-dev PGlite data and best-effort LLM traces in
+  `llm.ts`, which must never fail a call.
+- Tests use `freshDb()` from `test/db-helper.ts` (in-memory PGlite, users A and B); no network.
 - All LLM calls go through `src/providers/llm.ts`. Never call a provider directly elsewhere.
 - Prompts are files under `prompts/base`. Task prompts must stay job-agnostic: no
   occupation-specific vocabulary.

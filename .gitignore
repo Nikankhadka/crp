@@ -22,6 +22,8 @@ data/
 output/
 traces/
 logs/
+# Local embedded database (PGlite) and LLM traces
+/storage/
 
 # Personal seed bank and local agent config (never committed)
 seed/me/

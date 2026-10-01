@@ -6,8 +6,6 @@ export interface Paths {
   templatesDir: string;
   seedDir: string;
   storageDir: string;
-  jobsDir: string;
-  docsDir: string;
   tracesDir: string;
 }
 
@@ -18,7 +16,8 @@ function envPath(name: string, fallback: string): string {
 
 /**
  * Runtime paths, derived from APP_ROOT (default: cwd) so the CLI, tests and the Docker
- * standalone server all resolve the same directories. Storage defaults to `<appRoot>/storage`.
+ * standalone server all resolve the same directories. Storage (dev PGlite data, LLM traces)
+ * defaults to `<appRoot>/storage`.
  */
 export function resolvePaths(): Paths {
   const appRoot = envPath('APP_ROOT', process.cwd());
@@ -29,8 +28,6 @@ export function resolvePaths(): Paths {
     templatesDir: resolve(appRoot, 'templates'),
     seedDir: envPath('SEED_DIR', resolve(appRoot, 'seed', 'me')),
     storageDir,
-    jobsDir: resolve(storageDir, 'jobs'),
-    docsDir: envPath('DOCS_DIR', resolve(storageDir, 'docs')),
     tracesDir: resolve(storageDir, 'traces'),
   };
 }

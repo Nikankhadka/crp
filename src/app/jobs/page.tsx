@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import AppNav from '../../components/AppNav';
 import StatusBadge from '../../components/StatusBadge';
+import { currentUserId } from '../../server/currentUser';
 import { listJobs } from '../../server/jobStore';
 
 export const dynamic = 'force-dynamic';
@@ -11,8 +12,8 @@ function formatDate(iso: string): string {
   );
 }
 
-export default function JobsPage() {
-  const jobs = listJobs();
+export default async function JobsPage() {
+  const jobs = await listJobs(await currentUserId());
 
   return (
     <>
