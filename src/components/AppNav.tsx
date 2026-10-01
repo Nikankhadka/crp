@@ -4,6 +4,7 @@ import LogoutButton from './LogoutButton';
 
 const LINKS = [
   { href: '/jobs', label: 'Jobs' },
+  { href: '/discover', label: 'Discover' },
   { href: '/new', label: 'New' },
   { href: '/docs', label: 'Docs' },
   { href: '/bank', label: 'Bank' },

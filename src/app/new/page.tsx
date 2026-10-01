@@ -2,11 +2,28 @@ import AppNav from '../../components/AppNav';
 import NewJobForm from '../../components/NewJobForm';
 import { bankPageUser } from '../../server/currentUser';
 import { listDocs } from '../../server/docsStore';
+import { discoveryConfig } from '../../server/discovery';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewJobPage() {
+const first = (value: string | string[] | undefined): string | undefined => (Array.isArray(value) ? value[0] : value);
+
+// A link from Discover prefills the form; only an http(s) url is accepted, anything else is ignored.
+function httpUrl(value: string | undefined): string | undefined {
+  try {
+    return value !== undefined && ['http:', 'https:'].includes(new URL(value).protocol) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export default async function NewJobPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ url?: string | string[]; title?: string | string[] }>;
+}) {
   const docs = await listDocs((await bankPageUser()).id);
+  const params = await searchParams;
 
   return (
     <>
@@ -17,7 +34,12 @@ export default async function NewJobPage() {
           Paste the job description. The engine scores it, tailors your bank and renders the
           resume.
         </p>
-        <NewJobForm docs={docs} />
+        <NewJobForm
+          docs={docs}
+          firecrawl={discoveryConfig().firecrawl}
+          initialUrl={httpUrl(first(params.url))}
+          initialTitle={first(params.title)}
+        />
       </main>
     </>
   );

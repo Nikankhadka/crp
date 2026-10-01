@@ -1,4 +1,5 @@
 import { after, NextResponse } from 'next/server';
+import { MAX_JD_BYTES } from '../../../core/limits';
 import { withUser } from '../../../server/currentUser';
 import { runGeneration } from '../../../server/generate';
 import { createJob, listJobs } from '../../../server/jobStore';
@@ -10,8 +11,6 @@ export const runtime = 'nodejs';
 // fallback retry, twice over, plus rendering). A job that overruns is marked 'timed out' by the
 // stale sweep. Upgrade path: a durable queue or Workflow, or a plan with a longer maxDuration.
 export const maxDuration = 300;
-
-const MAX_JD_BYTES = 20 * 1024;
 
 export const GET = withUser(async (userId) => NextResponse.json({ jobs: await listJobs(userId) }));
 

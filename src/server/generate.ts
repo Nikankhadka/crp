@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { score } from '../core/score';
 import { tailor } from '../core/tailor';
+import { truncateToBytes } from '../core/truncate';
 import { buildDocx } from '../render/docx';
 import { mergeResume, renderToPageTarget } from '../render/typst';
 import { readDoc } from './docsStore';
@@ -30,18 +31,6 @@ const DEFAULT_DOCS_BUDGET_BYTES = 32 * 1024;
 export function promptDocsBudget(): number {
   const raw = Number(process.env.PROMPT_DOCS_BUDGET_BYTES);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_DOCS_BUDGET_BYTES;
-}
-
-const TRUNCATION_MARKER = '… [truncated]';
-
-function truncateToBytes(text: string, maxBytes: number): string {
-  if (Buffer.byteLength(text, 'utf8') <= maxBytes) return text;
-  const markerBytes = Buffer.byteLength(TRUNCATION_MARKER, 'utf8');
-  const clipped = Buffer.from(text, 'utf8')
-    .subarray(0, Math.max(0, maxBytes - markerBytes))
-    .toString('utf8')
-    .replace(/\uFFFD+$/, '');
-  return `${clipped.trimEnd()}${TRUNCATION_MARKER}`;
 }
 
 /**
