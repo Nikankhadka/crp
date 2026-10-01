@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z, type ZodError } from 'zod';
 
 export const ScoreSchema = z.object({
   score: z.number().int().min(0).max(100),
@@ -39,3 +39,10 @@ export const TailorSchema = z.object({
 });
 
 export type Tailored = z.infer<typeof TailorSchema>;
+
+/** Flatten zod issues into one `path: message; ...` string for retry prompts and errors. */
+export function formatIssues(error: ZodError): string {
+  return error.issues
+    .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+    .join('; ');
+}

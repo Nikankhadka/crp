@@ -1,20 +1,12 @@
-import { execFileSync, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createMockServer, VALID_SCORE, type MockServer } from './mock-server.js';
+import { closeServers, hasCommand, startServer } from './helpers.js';
+import { VALID_SCORE } from './mock-server.js';
 
 const hasSeed = existsSync('seed/me/resume.yaml');
 const maybe = hasSeed ? describe : describe.skip;
-
-function hasCommand(command: string, args: string[]): boolean {
-  try {
-    execFileSync(command, args, { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 const hasRenderTools =
   hasCommand('typst', ['--version']) && hasCommand('pdfinfo', ['-v']);
@@ -51,15 +43,10 @@ function run(baseUrl: string, args: string[] = ['score']): Promise<RunResult> {
 }
 
 maybe('cli score', () => {
-  const servers: MockServer[] = [];
-
-  afterEach(async () => {
-    await Promise.all(servers.splice(0).map((server) => server.close()));
-  });
+  afterEach(closeServers);
 
   it('prints a valid Score as JSON', async () => {
-    const server = await createMockServer(() => ({ content: JSON.stringify(VALID_SCORE) }));
-    servers.push(server);
+    const server = await startServer(() => ({ content: JSON.stringify(VALID_SCORE) }));
 
     const result = await run(server.url);
     expect(result.code).toBe(0);
@@ -70,14 +57,13 @@ maybe('cli score', () => {
 
   it('tailor prints { score, tailored } as JSON', async () => {
     // Distinguish tasks by the system prompt: the tailor task carries tailor.md's heading.
-    const server = await createMockServer((body) => {
+    const server = await startServer((body) => {
       const messages = (body as { messages?: { role: string; content: string }[] }).messages ?? [];
       const system = messages.find((m) => m.role === 'system')?.content ?? '';
       const isTailor = system.includes('tailor the bank to a job advertisement');
       const content = isTailor ? VALID_TAILORED : VALID_SCORE;
       return { content: JSON.stringify(content) };
     });
-    servers.push(server);
 
     const result = await run(server.url, ['tailor']);
     expect(result.code).toBe(0);
@@ -89,16 +75,15 @@ maybe('cli score', () => {
 });
 
 maybeRender('cli render', () => {
-  const servers: MockServer[] = [];
   const outDir = join('out', 'local', 'sample-jd', 'v1');
 
   afterEach(async () => {
     rmSync(join('out', 'local', 'sample-jd'), { recursive: true, force: true });
-    await Promise.all(servers.splice(0).map((server) => server.close()));
+    await closeServers();
   });
 
   it('scores, tailors and renders out/local/sample-jd/v1', async () => {
-    const server = await createMockServer((body) => {
+    const server = await startServer((body) => {
       const messages = (body as { messages?: { role: string; content: string }[] }).messages ?? [];
       const system = messages.find((m) => m.role === 'system')?.content ?? '';
       const content = system.includes('tailor the bank to a job advertisement')
@@ -106,7 +91,6 @@ maybeRender('cli render', () => {
         : VALID_SCORE;
       return { content: JSON.stringify(content) };
     });
-    servers.push(server);
 
     const result = await run(server.url, ['test/fixtures/sample-jd.txt']);
     expect(result.code).toBe(0);

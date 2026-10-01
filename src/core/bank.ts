@@ -78,11 +78,7 @@ export const BankSchema = z.strictObject({
 });
 
 export type Bank = z.infer<typeof BankSchema>;
-export type BankSection = z.infer<typeof SectionSchema>;
 export type BankItem = z.infer<typeof ItemSchema>;
-export type BankBullet = z.infer<typeof BulletSchema>;
-export type BankSummary = z.infer<typeof SummarySchema>;
-export type BankSkillGroup = z.infer<typeof SkillGroupSchema>;
 
 /** Parse and validate a resume bank from raw YAML text. Throws on malformed YAML or shape. */
 export function parseBank(yamlText: string): Bank {

@@ -2,34 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { parseBank, type Bank } from '../src/core/bank.js';
 import type { Tailored } from '../src/core/schemas.js';
 import { tailor } from '../src/core/tailor.js';
-import {
-  createMockServer,
-  type MockHandler,
-  type MockServer,
-} from './mock-server.js';
-
-const servers: MockServer[] = [];
-const LLM_KEYS = [
-  'LLM_BASE_URL',
-  'LLM_API_KEY',
-  'LLM_MODEL',
-  'LLM_FALLBACK_BASE_URL',
-  'LLM_FALLBACK_API_KEY',
-  'LLM_FALLBACK_MODEL',
-  'LLM_TIMEOUT_MS',
-];
-
-async function start(handler: MockHandler): Promise<MockServer> {
-  const server = await createMockServer(handler);
-  servers.push(server);
-  return server;
-}
-
-function setPrimary(url: string): void {
-  process.env.LLM_BASE_URL = url;
-  process.env.LLM_API_KEY = 'test-key';
-  process.env.LLM_MODEL = 'mock-model';
-}
+import { clearLlmEnv, closeServers, setPrimaryEnv, startServer } from './helpers.js';
 
 const bankText = `
 summaries:
@@ -75,19 +48,19 @@ const input = {
 };
 
 afterEach(async () => {
-  for (const key of LLM_KEYS) delete process.env[key];
-  await Promise.all(servers.splice(0).map((server) => server.close()));
+  clearLlmEnv();
+  await closeServers();
 });
 
 describe('tailor', () => {
   it('retries once when the first response fails zod, then returns', async () => {
     let calls = 0;
-    const primary = await start(() => {
+    const primary = await startServer(() => {
       calls += 1;
       const content = calls === 1 ? { ...validTailored, summaryRewrite: 'x'.repeat(401) } : validTailored;
       return { content: JSON.stringify(content) };
     });
-    setPrimary(primary.url);
+    setPrimaryEnv(primary.url);
 
     await expect(tailor(input)).resolves.toEqual(validTailored);
     expect(calls).toBe(2);
@@ -95,7 +68,7 @@ describe('tailor', () => {
 
   it('retries once when the first response fails the guard, then returns', async () => {
     let calls = 0;
-    const primary = await start(() => {
+    const primary = await startServer(() => {
       calls += 1;
       const content =
         calls === 1
@@ -113,17 +86,17 @@ describe('tailor', () => {
           : validTailored;
       return { content: JSON.stringify(content) };
     });
-    setPrimary(primary.url);
+    setPrimaryEnv(primary.url);
 
     await expect(tailor(input)).resolves.toEqual(validTailored);
     expect(calls).toBe(2);
   });
 
   it('throws after a second failing attempt with both failures listed', async () => {
-    const primary = await start(() => ({
+    const primary = await startServer(() => ({
       content: JSON.stringify({ ...validTailored, summaryId: 'nope' }),
     }));
-    setPrimary(primary.url);
+    setPrimaryEnv(primary.url);
 
     await expect(tailor(input)).rejects.toThrow(/validation failed after retry/);
   });

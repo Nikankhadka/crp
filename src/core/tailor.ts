@@ -2,7 +2,7 @@ import { completeJson } from '../providers/llm.js';
 import { type Bank } from './bank.js';
 import { guard, type Violation } from './guard.js';
 import { buildPrompt } from './prompt.js';
-import { TailorSchema, type Score, type Tailored } from './schemas.js';
+import { formatIssues, TailorSchema, type Score, type Tailored } from './schemas.js';
 
 export interface TailorInput {
   personal: string;
@@ -18,12 +18,6 @@ export interface TailorInput {
 interface AttemptResult {
   tailored?: Tailored;
   failure: string;
-}
-
-function formatIssues(error: { issues: { path: PropertyKey[]; message: string }[] }): string {
-  return error.issues
-    .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-    .join('; ');
 }
 
 function formatViolations(violations: Violation[]): string {

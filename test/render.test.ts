@@ -13,6 +13,7 @@ import {
   splitBold,
   type MergedResume,
 } from '../src/render/typst.js';
+import { hasCommand } from './helpers.js';
 
 const bank: Bank = parseBank(`
 basics:
@@ -200,15 +201,6 @@ describe('slugify', () => {
     expect(slugify('/tmp/___.pdf')).toBe('job');
   });
 });
-
-function hasCommand(command: string, args: string[]): boolean {
-  try {
-    execFileSync(command, args, { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 const hasTypst = hasCommand('typst', ['--version']);
 const hasPdfinfo = hasCommand('pdfinfo', ['-v']);

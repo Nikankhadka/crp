@@ -1,7 +1,6 @@
-import { ZodError } from 'zod';
 import { completeJson } from '../providers/llm.js';
 import { buildPrompt } from './prompt.js';
-import { ScoreSchema, type Score } from './schemas.js';
+import { formatIssues, ScoreSchema, type Score } from './schemas.js';
 
 export interface ScoreInput {
   personal: string;
@@ -9,12 +8,6 @@ export interface ScoreInput {
   job: string;
   descriptionIsFull: boolean;
   research?: string;
-}
-
-function formatIssues(error: ZodError): string {
-  return error.issues
-    .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-    .join('; ');
 }
 
 /**

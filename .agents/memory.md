@@ -23,6 +23,11 @@
   `nemotron-3-ultra-free`. A single key is enough via `LLM_API_KEY` or its `OPENCODE_API_KEY`
   alias. The fallback is active only when `LLM_FALLBACK_MODEL` or `LLM_FALLBACK_BASE_URL` is
   set; its base URL and key default to the effective primary. Explicit env always overrides.
+- Maintenance pass: removed four unused `z.infer` bank types (`BankSection`, `BankBullet`,
+  `BankSummary`, `BankSkillGroup`) and consolidated the duplicated zod-issue formatter into
+  `formatIssues` in `src/core/schemas.ts`. This repo has no dead-code tooling (no
+  knip/depcheck/ts-prune/eslint), so detection is manual: grep each export across `src` and
+  `test`, then confirm there is no dynamic `import()`/`require()` before deleting.
 
 ## Gotchas
 
@@ -56,6 +61,8 @@
   switches the checked-out branch mid-session. Re-check `git branch --show-current` and
   `git status` before staging, and base a new feature branch on the current HEAD so already
   committed WIP is not re-included in the new commit.
+- There is no `CONTEXT.md` or ADR directory. Domain and architecture notes live in
+  `.agents/memory.md`, `README.md` and `AGENTS.md`; keep those current instead.
 
 ## Conventions
 
@@ -67,3 +74,6 @@
 - Dates use an en dash (U+2013) "MMM YYYY - MMM YYYY"; never an em dash anywhere.
 - Personal reference material at the repo root (`masterresume/`, `README 2.md`, `/0*.md`) is
   gitignored and must not be edited, deleted or committed.
+- Shared test support lives in `test/helpers.ts`: use `startServer`/`closeServers`,
+  `setPrimaryEnv`/`clearLlmEnv` and `hasCommand` instead of re-declaring them per test file.
+  `LLM_ENV_KEYS` includes `OPENCODE_API_KEY` so no provider env var leaks between tests.
